@@ -44,6 +44,15 @@ public sealed class AppSettings
 
     public Hotkey FullscreenHotkey { get; set; } = DefaultFullscreenHotkey();
 
+    /// <summary>Select a screen region and copy its text (OCR) without opening the editor.</summary>
+    public Hotkey OcrHotkey { get; set; } = DefaultOcrHotkey();
+
+    /// <summary>Translucency of the editor window (0 = opaque, 100 = strongest glass effect).</summary>
+    public int GlassIntensity { get; set; } = 40;
+
+    /// <summary>Last used settings of the editor tools, so every tool starts the way it was left.</summary>
+    public ToolMemory Tools { get; set; } = new();
+
     // Same digits as Shottr; ⌘⇧3/4/5 stay with macOS, on Windows Ctrl replaces ⌘.
     private static HotkeyModifiers PrimaryModifiers =>
         (OperatingSystem.IsMacOS() ? HotkeyModifiers.Meta : HotkeyModifiers.Control) | HotkeyModifiers.Shift;
@@ -51,6 +60,8 @@ public sealed class AppSettings
     public static Hotkey DefaultRegionHotkey() => new(PrimaryModifiers, HotkeyKey.D2);
 
     public static Hotkey DefaultFullscreenHotkey() => new(PrimaryModifiers, HotkeyKey.D1);
+
+    public static Hotkey DefaultOcrHotkey() => new(PrimaryModifiers, HotkeyKey.O);
 
     /// <summary>Suggested location when the user picks a folder for the first time.</summary>
     public static string SuggestedSaveFolder() =>

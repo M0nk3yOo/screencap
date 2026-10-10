@@ -56,6 +56,10 @@ public partial class MainWindow : Window
         if (_tabs.Count > 0) Select(_tabs[^1]);
         UpdateEmptyState();
 
+        ApplyGlass();
+        ActualThemeVariantChanged += (_, _) => ApplyGlass();
+        app.SettingsChanged += ApplyGlass;
+
         // Tunnel so tool shortcuts work no matter which toolbar control has focus.
         AddHandler(KeyDownEvent, OnPreviewKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
@@ -73,6 +77,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _app.Tabs.CollectionChanged -= OnTabsChanged;
+        _app.SettingsChanged -= ApplyGlass;
         base.OnClosed(e);
     }
 
@@ -195,6 +200,7 @@ public partial class MainWindow : Window
             },
         };
         ToolTip.SetTip(chip, $"{capture.CreatedAt:dd.MM.yyyy HH:mm:ss} · {capture.Image.Width} × {capture.Image.Height} px");
+        chip.ContextMenu = CreateTabMenu(capture);
         chip.PointerPressed += (_, e) =>
         {
             if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
@@ -262,6 +268,80 @@ public partial class MainWindow : Window
         if (_draggedTab is { } tab) tab.Chip.Opacity = 1;
         _draggedTab = null;
         _isDraggingTab = false;
+    }
+
+    private ContextMenu CreateTabMenu(Capture capture)
+    {
+        MenuItem Item(string header, Action action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => action();
+            return item;
+        }
+
+        var reveal = Item($"Im {AppController.FileManagerName} zeigen", () =>
+        {
+            if (capture.LastSavedPath is { } path && File.Exists(path)) AppController.RevealInFileManager(path);
+        });
+        var menu = new ContextMenu
+        {
+            Items =
+            {
+                reveal,
+                Item("Speicherort öffnen", () => _ = _app.OpenSaveFolderAsync(this)),
+                new Separator(),
+                Item("Schließen", () => _app.CloseTab(capture)),
+                Item("Andere Reiter schließen", () =>
+                {
+                    foreach (var other in _app.Tabs.Where(c => c != capture).ToList()) _app.CloseTab(other);
+                }),
+            },
+        };
+        // "Show in Finder" only makes sense once the screenshot was saved.
+        menu.Opening += (_, _) => reveal.IsVisible = capture.LastSavedPath is { } p && File.Exists(p);
+        return menu;
+    }
+
+    // ------------------------------------------------------------ glass
+
+    private static readonly (string Key, double Strength)[] GlassBrushes =
+    [
+        ("ScChromeBrush", 0.7),
+        ("ScCanvasBrush", 0.5),
+        ("ScGroupBrush", 0.45),
+        ("ScTabSelectedBrush", 0.35),
+    ];
+
+    /// <summary>
+    /// Translucent window (vibrancy on macOS, Mica/Acrylic on Windows): the chrome brushes
+    /// get more transparent the higher the setting, so the blurred desktop shines through.
+    /// </summary>
+    private IDisposable? _glassBackground;
+
+    private void ApplyGlass()
+    {
+        var intensity = Math.Clamp(_app.Settings.GlassIntensity, 0, 100) / 100.0;
+        if (intensity <= 0)
+        {
+            TransparencyLevelHint = [WindowTransparencyLevel.None];
+            foreach (var (key, _) in GlassBrushes) Resources.Remove(key);
+            // Back to the opaque theme color, following light/dark switches.
+            _glassBackground?.Dispose();
+            _glassBackground = Bind(BackgroundProperty, this.GetResourceObservable("ScChromeBrush"));
+            return;
+        }
+
+        TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur];
+        _glassBackground?.Dispose();
+        _glassBackground = null;
+        Background = Brushes.Transparent;
+        foreach (var (key, strength) in GlassBrushes)
+        {
+            if (Application.Current?.TryGetResource(key, ActualThemeVariant, out var value) != true || value is not SolidColorBrush brush)
+                continue;
+            var alpha = (byte)Math.Round(255 * (1 - intensity * strength));
+            Resources[key] = new SolidColorBrush(Color.FromArgb(alpha, brush.Color.R, brush.Color.G, brush.Color.B));
+        }
     }
 
     private void UpdateEmptyState()

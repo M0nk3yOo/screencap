@@ -22,19 +22,28 @@ public sealed class Capture(PixelBuffer image, double scaling)
     public AnnotationDocument Annotations { get; init; } = new();
 
     /// <summary>
-    /// The whole drawing area: the screenshot plus every inserted image, so moving an inserted
-    /// capture past the edge grows the canvas instead of cutting the image off. Image pixels.
+    /// The whole drawing area: the screenshot plus every visible annotation, so moving an
+    /// image, text or shape past the edge grows the canvas instead of cutting it off.
+    /// Pixelate and spotlight only act on the screenshot itself and never grow it.
     /// </summary>
     public IntRect ContentBounds
     {
         get
         {
             var bounds = new IntRect(0, 0, Image.Width, Image.Height);
-            foreach (var inserted in Annotations.Items.OfType<ImageAnnotation>())
-                bounds = bounds.Union(IntRect.FromRectD(inserted.Rect));
+            foreach (var annotation in Annotations.Items)
+            {
+                if (annotation.Hidden || annotation is PixelateAnnotation or SpotlightAnnotation) continue;
+                var b = annotation.Bounds;
+                if (b.Width <= 0 && b.Height <= 0) continue;
+                bounds = bounds.Union(IntRect.FromRectD(b));
+            }
             return bounds;
         }
     }
+
+    /// <summary>Where this screenshot was last saved, for "show in Finder/Explorer".</summary>
+    public string? LastSavedPath { get; set; }
 
     /// <summary>The part that is shown and exported: the crop, or the whole content.</summary>
     public IntRect VisibleRect =>

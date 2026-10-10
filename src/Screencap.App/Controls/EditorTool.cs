@@ -12,6 +12,7 @@ internal enum EditorTool
     Counter,
     Pixelate,
     Spotlight,
+    TextRecognition,
     ColorPicker,
 }
 

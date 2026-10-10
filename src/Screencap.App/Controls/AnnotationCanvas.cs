@@ -42,7 +42,11 @@ internal sealed class AnnotationCanvas : Control
     private CropDrag _cropDrag;
     private RectD _cropStart;
     private Annotation? _styleEditTarget;
-    private IntRect? _frozenView;
+    private RectD? _ocrDraft;
+    private Point _dragStartScreen;
+    private Point _lastScreen;
+    private IntRect _lastView;
+    private bool _dragGrowing;
     private string? _activeHandle;
     private Annotation? _handleOriginal;
     private bool _handleRecorded;
@@ -138,7 +142,7 @@ internal sealed class AnnotationCanvas : Control
     /// The area currently displayed, in image pixels. Frozen while dragging, so a growing
     /// canvas (inserted image moved past the edge) doesn't shift the image under the pointer.
     /// </summary>
-    public IntRect ViewRect => _frozenView ?? (Tool == EditorTool.Crop ? _capture.ContentBounds : _capture.VisibleRect);
+    public IntRect ViewRect => Tool == EditorTool.Crop ? _capture.ContentBounds : _capture.VisibleRect;
 
     /// <summary>Request to open the inline text editor at an image position (existing text or null for new).</summary>
     public event Action<PointD, TextAnnotation?>? TextEditRequested;
@@ -149,6 +153,26 @@ internal sealed class AnnotationCanvas : Control
     public event Action<PointD?>? PointerImagePositionChanged;
 
     public event Action? SelectionChanged;
+
+    /// <summary>Moving or resizing an existing annotation started/ended (the canvas may grow meanwhile).</summary>
+    public event Action? DragStarted;
+
+    public event Action? DragEnded;
+
+    /// <summary>
+    /// The visible area's origin moved by (dx, dy) image pixels during a drag, because the
+    /// canvas grew to the left/top. The host shifts the canvas so nothing jumps under the pointer.
+    /// </summary>
+    public event Action<double, double>? ViewOriginShifted;
+
+    /// <summary>A region was marked with the text recognition tool (image pixels).</summary>
+    public event Action<IntRect>? TextRegionSelected;
+
+    /// <summary>The user started changing the image (drawing, moving, resizing).</summary>
+    public event Action? EditingStarted;
+
+    /// <summary>An annotation was clicked with the select tool (also when it was already selected).</summary>
+    public event Action? AnnotationClicked;
 
     public void Select(Annotation? annotation)
     {
@@ -256,6 +280,12 @@ internal sealed class AnnotationCanvas : Control
             }
 
             if (Tool == EditorTool.Pixelate && _draft is null) RenderTextRegions(context, scale);
+            if (_ocrDraft is { } ocrRect)
+            {
+                var r = AnnotationRenderer.ToRect(ocrRect);
+                context.DrawRectangle(new SolidColorBrush(Avalonia.Media.Color.FromArgb(0x26, 0, 122, 255)),
+                    new Pen(new SolidColorBrush(Colors.DodgerBlue), 2 / scale, new DashStyle([4, 3], 0)), r);
+            }
             if (Tool == EditorTool.Crop) RenderCropOverlay(context, contentRect, scale);
             else if (Selected is not null && Selected != EditingText) RenderSelection(context, Selected, scale);
         }
@@ -501,7 +531,8 @@ internal sealed class AnnotationCanvas : Control
 
         var p = ToImage(point.Position);
         _dragStart = _lastPoint = p;
-        _frozenView = ViewRect;
+        _dragStartScreen = _lastScreen = ScreenPosition(e);
+        _lastView = ViewRect;
         var hitTolerance = 6 / DisplayScale;
         var scaling = _capture.Scaling;
 
@@ -535,6 +566,7 @@ internal sealed class AnnotationCanvas : Control
                 }
                 if (hit is not null)
                 {
+                    AnnotationClicked?.Invoke();
                     _moving = true;
                     _moveRecorded = false;
                     e.Pointer.Capture(this);
@@ -561,6 +593,7 @@ internal sealed class AnnotationCanvas : Control
             case EditorTool.Counter:
                 // Placed on release; dragging pulls out a pointer tail.
                 Select(null);
+                EditingStarted?.Invoke();
                 _draft = new CounterAnnotation
                 {
                     Center = p,
@@ -576,10 +609,17 @@ internal sealed class AnnotationCanvas : Control
                 ColorPicked?.Invoke(_capture.Image.GetPixel((int)p.X, (int)p.Y));
                 return;
 
+            case EditorTool.TextRecognition:
+                _ocrDraft = new RectD(p.X, p.Y, 0, 0);
+                e.Pointer.Capture(this);
+                InvalidateVisual();
+                return;
+
             default:
                 // Pixelate: remember a clicked text so a click without dragging blurs it.
                 _pressedText = Tool == EditorTool.Pixelate ? TextAt(p, e.KeyModifiers.HasFlag(KeyModifiers.Alt)) : null;
                 Select(null);
+                EditingStarted?.Invoke();
                 _draft = CreateDraft(p);
                 e.Pointer.Capture(this);
                 InvalidateVisual();
@@ -592,6 +632,7 @@ internal sealed class AnnotationCanvas : Control
         base.OnPointerMoved(e);
         var p = ToImage(e.GetPosition(this));
         PointerImagePositionChanged?.Invoke(p);
+        var screen = ScreenPosition(e);
 
         if (_activeHandle is { } activeHandle && Selected is { } target && _handleOriginal is { } original)
         {
@@ -599,9 +640,20 @@ internal sealed class AnnotationCanvas : Control
             {
                 _capture.Annotations.BeginChange();
                 _handleRecorded = true;
+                EditingStarted?.Invoke();
+                BeginGrowingDrag();
             }
-            DragHandle(target, original, activeHandle, p, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            // Measured from the press in screen space: stays correct while the canvas grows and shifts.
+            var anchored = new PointD(_dragStart.X + (screen.X - _dragStartScreen.X) / DisplayScale,
+                _dragStart.Y + (screen.Y - _dragStartScreen.Y) / DisplayScale);
+            DragHandle(target, original, activeHandle, anchored, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             _capture.Annotations.NotifyChanged();
+            ReportViewShift();
+        }
+        else if (_ocrDraft is not null)
+        {
+            _ocrDraft = RectD.FromPoints(_dragStart, p);
+            InvalidateVisual();
         }
         else if (_cropDraft is not null)
         {
@@ -647,15 +699,38 @@ internal sealed class AnnotationCanvas : Control
             {
                 _capture.Annotations.BeginChange();
                 _moveRecorded = true;
+                EditingStarted?.Invoke();
+                BeginGrowingDrag();
             }
-            Selected.Move(p.X - _lastPoint.X, p.Y - _lastPoint.Y);
+            Selected.Move((screen.X - _lastScreen.X) / DisplayScale, (screen.Y - _lastScreen.Y) / DisplayScale);
             _capture.Annotations.NotifyChanged();
+            ReportViewShift();
         }
         else if (_draft is null && !_moving)
         {
             Cursor = _toolCursor;
         }
         _lastPoint = p;
+        _lastScreen = screen;
+    }
+
+    /// <summary>Pointer position relative to the window, which does not move when the canvas grows.</summary>
+    private Point ScreenPosition(PointerEventArgs e) =>
+        TopLevel.GetTopLevel(this) is { } top ? e.GetPosition(top) : e.GetPosition(this);
+
+    private void BeginGrowingDrag()
+    {
+        _dragGrowing = true;
+        _lastView = ViewRect;
+        DragStarted?.Invoke();
+    }
+
+    private void ReportViewShift()
+    {
+        var view = ViewRect;
+        if (view.X != _lastView.X || view.Y != _lastView.Y)
+            ViewOriginShifted?.Invoke(view.X - _lastView.X, view.Y - _lastView.Y);
+        _lastView = view;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -669,10 +744,19 @@ internal sealed class AnnotationCanvas : Control
             _handleOriginal = null;
             InvalidateMeasure();
         }
-        if (_frozenView is not null)
+        if (_dragGrowing)
         {
-            _frozenView = null;
-            InvalidateMeasure();
+            _dragGrowing = false;
+            DragEnded?.Invoke();
+        }
+
+        if (_ocrDraft is { } ocr)
+        {
+            _ocrDraft = null;
+            InvalidateVisual();
+            var region = IntRect.FromRectD(ocr).Intersect(new IntRect(0, 0, _capture.Image.Width, _capture.Image.Height));
+            if (region.Width >= MinCropSize && region.Height >= MinCropSize) TextRegionSelected?.Invoke(region);
+            return;
         }
 
         if (_cropDraft is { } crop)

@@ -15,6 +15,7 @@ internal static class TrayMenu
         {
             Item("Bereich aufnehmen", () => _ = app.CaptureRegionAsync(), app.Settings.RegionHotkey),
             Item("Vollbild aufnehmen", () => _ = app.CaptureFullscreenAsync(), app.Settings.FullscreenHotkey),
+            Item("Text erkennen …", () => _ = app.CaptureTextAsync(), app.Settings.OcrHotkey),
             new NativeMenuItemSeparator(),
             Item("Hauptfenster öffnen", () => app.ShowMainWindow()),
             Item("Einstellungen …", app.ShowSettings),
@@ -46,21 +47,8 @@ internal static class TrayMenu
     /// <summary>Only shown next to the menu entry; the global hotkey itself is registered natively.</summary>
     private static KeyGesture? ToKeyGesture(Hotkey hotkey)
     {
-        var key = hotkey.Key switch
-        {
-            >= HotkeyKey.D0 and <= HotkeyKey.D9 => Key.D0 + (hotkey.Key - HotkeyKey.D0),
-            >= HotkeyKey.A and <= HotkeyKey.Z => Key.A + (hotkey.Key - HotkeyKey.A),
-            >= HotkeyKey.F1 and <= HotkeyKey.F12 => Key.F1 + (hotkey.Key - HotkeyKey.F1),
-            HotkeyKey.PrintScreen => Key.PrintScreen,
-            _ => Key.None,
-        };
-        if (key == Key.None) return null;
-        var modifiers = KeyModifiers.None;
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Control)) modifiers |= KeyModifiers.Control;
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Alt)) modifiers |= KeyModifiers.Alt;
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Shift)) modifiers |= KeyModifiers.Shift;
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Meta)) modifiers |= KeyModifiers.Meta;
-        return new KeyGesture(key, modifiers);
+        var key = HotkeyMapping.ToKey(hotkey.Key);
+        return key == Key.None ? null : new KeyGesture(key, HotkeyMapping.ToKeyModifiers(hotkey.Modifiers));
     }
 
     /// <summary>

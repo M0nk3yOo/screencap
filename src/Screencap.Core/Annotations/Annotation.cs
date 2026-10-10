@@ -156,7 +156,7 @@ public sealed class TextAnnotation : Annotation
     /// <summary>Font family name; null = the app's default font.</summary>
     public string? FontFamily { get; set; }
 
-    public bool Bold { get; set; } = true;
+    public bool Bold { get; set; }
     public bool Italic { get; set; }
     public bool Underline { get; set; }
     public bool Strikethrough { get; set; }

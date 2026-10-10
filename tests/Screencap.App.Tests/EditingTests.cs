@@ -190,4 +190,59 @@ public sealed class EditingTests : IDisposable
         Assert.Equal(255, jpeg.GetPixel(120, 70).A);
         Assert.InRange((int)jpeg.GetPixel(120, 70).R, 240, 255);
     }
+
+    [AvaloniaFact]
+    public void ColorPicker_AdoptsColor_RecolorsSelection_AndReturnsToTool()
+    {
+        var pixels = TestImages.Solid(200, 100); // BGRA 40,120,200 -> #C87828
+        var capture = new Capture(pixels, 1);
+        var arrow = new ArrowAnnotation { Start = new PointD(10, 10), End = new PointD(100, 10) };
+        capture.Annotations.Add(arrow);
+        var (_, main, canvas) = Open(capture);
+        Key(main, PhysicalKey.A);
+        canvas.Select(arrow);
+
+        Key(main, PhysicalKey.I);
+        Assert.Equal(EditorTool.ColorPicker, canvas.Tool);
+        Assert.Same(arrow, canvas.Selected);
+
+        var s = canvas.DisplayScale;
+        var point = canvas.TranslatePoint(new Point(150 * s, 60 * s), main)!.Value;
+        main.MouseDown(point, MouseButton.Left);
+        main.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("#C87828", canvas.Color.ToHex());
+        Assert.Equal("#C87828", ((ArrowAnnotation)capture.Annotations.Items[0]).Color.ToHex());
+        Assert.Equal(EditorTool.Arrow, canvas.Tool);
+    }
+
+    [AvaloniaFact]
+    public void OptionsPopup_HidesWhileDrawing_ReturnsOnToolChoice()
+    {
+        var capture = new Capture(TestImages.Solid(400, 300), 1);
+        var (_, main, canvas) = Open(capture);
+        var bar = Named<Border>(main, "OptionsBar");
+
+        Key(main, PhysicalKey.R);
+        Assert.True(bar.IsVisible);
+
+        Drag(main, canvas, new Point(50, 50), new Point(150, 120));
+        Assert.False(bar.IsVisible);
+
+        Key(main, PhysicalKey.R);
+        Assert.True(bar.IsVisible);
+
+        // Clicking an existing shape with the select tool shows its options again.
+        Drag(main, canvas, new Point(200, 200), new Point(260, 260));
+        Assert.False(bar.IsVisible);
+        Key(main, PhysicalKey.V);
+        var s = canvas.DisplayScale;
+        var edge = canvas.TranslatePoint(new Point(50 * s, 80 * s), main)!.Value;
+        main.MouseDown(edge, MouseButton.Left);
+        main.MouseUp(edge, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.IsType<RectangleAnnotation>(canvas.Selected);
+        Assert.True(bar.IsVisible);
+    }
 }

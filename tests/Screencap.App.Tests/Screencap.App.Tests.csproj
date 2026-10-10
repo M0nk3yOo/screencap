@@ -9,6 +9,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Avalonia.Headless.XUnit" />
+    <PackageReference Include="ZXing.Net" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

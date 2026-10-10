@@ -96,6 +96,7 @@ internal sealed class AppController
     {
         _sessionSaveTimer.Stop();
         _cleanupTimer?.Stop();
+        if (_settingsSaveTimer?.IsEnabled == true) _settingsStore.Save(Settings);
         SaveSession();
         _platform.Hotkeys.Dispose();
         _trayIcon?.Dispose();
@@ -113,6 +114,20 @@ internal sealed class AppController
     /// <summary>Raised after any setting changed, so open editors can refresh (e.g. canvas background).</summary>
     public event Action? SettingsChanged;
 
+    private DispatcherTimer? _settingsSaveTimer;
+
+    /// <summary>Saves shortly after the last change; for sliders that change many times per second.</summary>
+    public void SaveSettingsSoon()
+    {
+        _settingsSaveTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(600), DispatcherPriority.Background, (_, _) =>
+        {
+            _settingsSaveTimer!.Stop();
+            _settingsStore.Save(Settings);
+        });
+        _settingsSaveTimer.Stop();
+        _settingsSaveTimer.Start();
+    }
+
     /// <summary>Called when cleanup settings change, so the new limit applies right away.</summary>
     public void ApplyCleanupSettings() => CleanUpOldScreenshots();
 
@@ -129,6 +144,8 @@ internal sealed class AppController
             failed.Add(Settings.RegionHotkey);
         if (!_platform.Hotkeys.TryRegister(Settings.FullscreenHotkey, () => Dispatcher.UIThread.Post(() => _ = CaptureFullscreenAsync())))
             failed.Add(Settings.FullscreenHotkey);
+        if (!_platform.Hotkeys.TryRegister(Settings.OcrHotkey, () => Dispatcher.UIThread.Post(() => _ = CaptureTextAsync())))
+            failed.Add(Settings.OcrHotkey);
         FailedHotkeys = failed;
         if (failed.Count > 0)
             Console.Error.WriteLine($"Hotkeys already in use: {string.Join(", ", failed.Select(h => h.ToDisplayString(IsMac)))}");
@@ -143,6 +160,40 @@ internal sealed class AppController
     {
         if (await SelectRegionAsync() is { } selection)
             await OnCapturedAsync(selection.Capture, selection.Region, selection.Screen);
+    }
+
+    /// <summary>Marks a screen region and recognizes its text; the result box copies it right away.</summary>
+    public async Task CaptureTextAsync()
+    {
+        if (await SelectRegionAsync() is not { } selection) return;
+        string text;
+        IReadOnlyList<DecodedCode> codes;
+        try
+        {
+            // QR codes are read alongside the text: marking a code shows its content.
+            var textTask = RecognizeTextAsync(selection.Capture);
+            var codesTask = ReadCodesAsync(selection.Capture);
+            text = await textTask;
+            codes = await codesTask;
+        }
+        catch (Exception e)
+        {
+            await MessageDialog.ShowErrorAsync("Texterkennung fehlgeschlagen", e);
+            return;
+        }
+        new TextResultWindow(this, selection.Capture, text, codes, selection.Region, selection.Screen).Show();
+    }
+
+    /// <summary>Stops the global hotkeys, e.g. while the user records a new one.</summary>
+    public void SuspendHotkeys() => _platform.Hotkeys.UnregisterAll();
+
+    /// <summary>Re-registers hotkeys and rebuilds the tray menu after hotkey settings changed.</summary>
+    public void ApplyHotkeySettings()
+    {
+        SaveSettings();
+        RegisterHotkeys();
+        _trayIcon?.Dispose();
+        _trayIcon = TrayMenu.Create(this);
     }
 
     /// <summary>From the editor: capture straight into a new tab, without preview.</summary>
@@ -236,9 +287,30 @@ internal sealed class AppController
         }
     }
 
-    /// <summary>Recognizes the text in the visible (cropped) part of the screenshot.</summary>
-    public async Task<string> RecognizeTextAsync(Capture capture) =>
-        TextLayout.ToPlainText(await RecognizeLinesAsync(capture));
+    /// <summary>Recognizes the text in the visible (cropped) part of the screenshot, or in <paramref name="region"/>.</summary>
+    public async Task<string> RecognizeTextAsync(Capture capture, IntRect? region = null)
+    {
+        if (region is not { } r) return TextLayout.ToPlainText(await RecognizeLinesAsync(capture));
+        var area = r.Intersect(new IntRect(0, 0, capture.Image.Width, capture.Image.Height));
+        if (area.IsEmpty) return "";
+        return TextLayout.ToPlainText(await _platform.TextRecognizer.RecognizeAsync(capture.Image.Crop(area)));
+    }
+
+    /// <summary>QR codes and barcodes in the visible image or in <paramref name="region"/>.</summary>
+    public Task<IReadOnlyList<DecodedCode>> ReadCodesAsync(Capture capture, IntRect? region = null)
+    {
+        var full = new IntRect(0, 0, capture.Image.Width, capture.Image.Height);
+        var area = (region ?? capture.VisibleRect).Intersect(full);
+        if (area.IsEmpty) return Task.FromResult<IReadOnlyList<DecodedCode>>([]);
+        var image = area == full ? capture.Image : capture.Image.Crop(area);
+        return Task.Run(() => CodeReader.Read(image));
+    }
+
+    public static void OpenLink(string url)
+    {
+        if (IsMac) System.Diagnostics.Process.Start("open", [url]);
+        else System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+    }
 
     /// <summary>OCR lines with boxes in full-image coordinates, of the visible part or the whole image.</summary>
     public async Task<IReadOnlyList<RecognizedLine>> RecognizeLinesAsync(Capture capture, bool visibleOnly = true)
@@ -359,6 +431,7 @@ internal sealed class AppController
         var path = ScreenshotFiles.UniquePath(Path.Combine(folder, capture.FileNameFor(Settings.SaveFormat)));
         await File.WriteAllBytesAsync(path, Encode(capture, Settings.SaveFormat));
         capture.Annotations.MarkSaved();
+        capture.LastSavedPath = path;
         return path;
     }
 
@@ -433,7 +506,8 @@ internal sealed class AppController
         await using (var stream = await file.OpenWriteAsync())
             await stream.WriteAsync(bytes);
         capture.Annotations.MarkSaved();
-        return file.TryGetLocalPath() ?? file.Name;
+        capture.LastSavedPath = file.TryGetLocalPath();
+        return capture.LastSavedPath ?? file.Name;
     }
 
     public IReadOnlyList<PinWindow> Pins => _pins;
@@ -496,6 +570,23 @@ internal sealed class AppController
     }
 
     public void CloseTab(Capture capture) => Tabs.Remove(capture);
+
+    public static string FileManagerName => IsMac ? "Finder" : "Explorer";
+
+    /// <summary>Shows the file selected in Finder / Explorer.</summary>
+    public static void RevealInFileManager(string path)
+    {
+        if (IsMac) System.Diagnostics.Process.Start("open", ["-R", path]);
+        else System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+    }
+
+    /// <summary>Opens the save folder, asking for one first if none is set.</summary>
+    public async Task OpenSaveFolderAsync(TopLevel topLevel)
+    {
+        if (await EnsureSaveFolderAsync(topLevel) is not { } folder) return;
+        Directory.CreateDirectory(folder);
+        await topLevel.Launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(folder));
+    }
 
     // ---------------------------------------------------------------- session
 

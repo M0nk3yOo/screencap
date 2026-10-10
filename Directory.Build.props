@@ -6,5 +6,8 @@
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Version>1.0.0</Version>
+    <Product>Screencap</Product>
+    <Copyright>© 2026 Screencap</Copyright>
   </PropertyGroup>
 </Project>

@@ -63,13 +63,31 @@
     </StackPanel>
 
     <StackPanel Spacing="8">
+      <TextBlock Text="Darstellung" FontWeight="SemiBold" FontSize="15" />
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="Glas-Effekt" VerticalAlignment="Center" Width="80" />
+        <Slider x:Name="GlassIntensity" Minimum="0" Maximum="100" Width="200" SmallChange="5" LargeChange="10" />
+        <TextBlock x:Name="GlassIntensityText" VerticalAlignment="Center" Width="60" />
+      </StackPanel>
+      <TextBlock Text="Durchscheinendes Editorfenster (macOS: Vibrancy, Windows: Mica/Acrylic). 0 = aus."
+                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
       <TextBlock Text="Tastenkürzel" FontWeight="SemiBold" FontSize="15" />
-      <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" RowSpacing="6">
-        <TextBlock Text="Bereich aufnehmen" />
-        <TextBlock x:Name="RegionHotkey" Grid.Column="1" FontWeight="SemiBold" />
-        <TextBlock Grid.Row="1" Text="Vollbild aufnehmen" />
-        <TextBlock x:Name="FullscreenHotkey" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" />
+      <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+        <TextBlock Text="Bereich aufnehmen" VerticalAlignment="Center" />
+        <Button x:Name="RegionHotkey" Grid.Column="1" MinWidth="180" />
+        <TextBlock Grid.Row="1" Text="Vollbild aufnehmen" VerticalAlignment="Center" />
+        <Button x:Name="FullscreenHotkey" Grid.Row="1" Grid.Column="1" MinWidth="180" />
+        <TextBlock Grid.Row="2" Text="Text erkennen" VerticalAlignment="Center" />
+        <Button x:Name="OcrHotkey" Grid.Row="2" Grid.Column="1" MinWidth="180" />
       </Grid>
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button x:Name="ResetHotkeys" Content="Standard wiederherstellen" />
+        <TextBlock Text="Klicken und neue Tastenkombination drücken (Esc bricht ab)."
+                   Opacity="0.6" FontSize="12" VerticalAlignment="Center" />
+      </StackPanel>
       <TextBlock x:Name="HotkeyWarning" Foreground="#E5484D" TextWrapping="Wrap" FontSize="12" IsVisible="False" />
     </StackPanel>
   </StackPanel>

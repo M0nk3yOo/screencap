@@ -9,6 +9,9 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Avalonia.Interactivity;
+using Screencap.Core.Settings;
+using Screencap.Core.Ocr;
 using Screencap.App.Controls;
 using Screencap.App.Rendering;
 using Screencap.App.Services;
@@ -35,7 +38,8 @@ public partial class EditorView : UserControl
         (EditorTool.Counter, "IconCounter", "Nummer – ziehen für einen Zeiger", Key.N, 1),
         (EditorTool.Pixelate, "IconPixelate", "Verpixeln / Verwischen", Key.B, 2),
         (EditorTool.Spotlight, "IconSpotlight", "Spotlight", Key.S, 2),
-        (EditorTool.ColorPicker, "IconPicker", "Farbe aufnehmen", Key.I, 2),
+        (EditorTool.TextRecognition, "IconOcr", "Text markieren – Bereich aufziehen, Text und QR-Codes werden erkannt", Key.E, 3),
+        (EditorTool.ColorPicker, "IconPicker", "Pipette", Key.I, 2),
     ];
 
     private static readonly uint[] Palette =
@@ -50,6 +54,16 @@ public partial class EditorView : UserControl
     private bool _updatingOptions;
     private bool _fitToWindow = true;
     private EditorTool _toolBeforeCrop = EditorTool.Arrow;
+    private EditorTool _toolBeforePicker = EditorTool.Arrow;
+
+    /// <summary>
+    /// The options popup hides once the user goes on editing the image, and comes back when
+    /// a tool is chosen, an annotation is clicked or text is edited.
+    /// </summary>
+    private bool _optionsDismissed;
+
+    /// <summary>True while an annotation is moved or resized; the canvas is pinned meanwhile.</summary>
+    private bool _dragging;
     private TextBox? _textEditor;
     /// <summary>Working copy of the text being typed (new, or a clone of the edited one).</summary>
     private TextAnnotation? _textDraft;
@@ -86,6 +100,32 @@ public partial class EditorView : UserControl
 
         _canvas.TextEditRequested += BeginTextEdit;
         _canvas.ColorPicked += OnColorPicked;
+        _canvas.DragStarted += PinCanvasForDrag;
+        _canvas.ViewOriginShifted += (dx, dy) =>
+        {
+            // Growing to the left/top moves the image origin; shift the canvas the other way.
+            var m = CanvasFrame.Margin;
+            CanvasFrame.Margin = new Thickness(m.Left + dx * _canvas.DisplayScale, m.Top + dy * _canvas.DisplayScale, m.Right, m.Bottom);
+        };
+        _canvas.DragEnded += UnpinCanvas;
+        _canvas.TextRegionSelected += region => _ = RecognizeTextAsync(region);
+        Scroller.AddHandler(PointerWheelChangedEvent, OnScrollerWheel, RoutingStrategies.Tunnel);
+        Scroller.PointerTouchPadGestureMagnify += (_, e) =>
+        {
+            ZoomAt(_canvas.Zoom * (1 + e.Delta.X), e.GetPosition(_canvas), e.GetPosition(Scroller));
+            e.Handled = true;
+        };
+        LoadToolMemory();
+        _canvas.EditingStarted += () =>
+        {
+            _optionsDismissed = true;
+            OptionsBar.IsVisible = false;
+        };
+        _canvas.AnnotationClicked += () =>
+        {
+            _optionsDismissed = false;
+            UpdateOptions();
+        };
         _canvas.SelectionChanged += () =>
         {
             UpdateOptions();
@@ -100,7 +140,7 @@ public partial class EditorView : UserControl
         {
             UpdateHistoryButtons();
             RebuildLayers();
-            if (_fitToWindow) Dispatcher.UIThread.Post(ApplyFitZoom);
+            if (_fitToWindow && !_dragging) Dispatcher.UIThread.Post(ApplyFitZoom);
         };
         Scroller.SizeChanged += (_, _) =>
         {
@@ -108,7 +148,7 @@ public partial class EditorView : UserControl
         };
 
         SelectTool(EditorTool.Arrow);
-        SelectColor(_swatches[0].Color);
+        SelectColor(ArgbColor.FromUInt(_app.Settings.Tools.Color));
         UpdateHistoryButtons();
     }
 
@@ -123,7 +163,7 @@ public partial class EditorView : UserControl
         var lastGroup = 0;
         foreach (var (tool, icon, name, key, group) in Tools)
         {
-            if (group != lastGroup)
+            if (group != lastGroup && group != 3)
             {
                 ToolPanel.Children.Add(new Border { Classes = { "divider" }, Margin = new Thickness(3, 6) });
                 lastGroup = group;
@@ -136,7 +176,9 @@ public partial class EditorView : UserControl
             ToolTip.SetTip(button, $"{name} ({key})");
             button.Click += (_, _) => SelectTool(tool);
             _toolButtons[tool] = button;
-            ToolPanel.Children.Add(button);
+            // Group 3 lives in the recognition group together with "all text" and QR.
+            if (group == 3) RecognitionPanel.Children.Insert(0, button);
+            else ToolPanel.Children.Add(button);
         }
     }
 
@@ -144,7 +186,7 @@ public partial class EditorView : UserControl
     {
         SwatchPanel.Children.Clear();
         _swatches.Clear();
-        var custom = _app.Settings.CustomColors.Select(ArgbColor.FromUInt).Where(c => !Palette.Contains(c.Value));
+        var custom = _app.Settings.CustomColors.Select(ArgbColor.FromUInt).Where(c => !Palette.Contains(c.Value)).ToList();
         foreach (var color in Palette.Select(ArgbColor.FromUInt).Concat(custom))
         {
             var swatch = new Border
@@ -152,6 +194,21 @@ public partial class EditorView : UserControl
                 Background = new SolidColorBrush(AnnotationRenderer.ToColor(color)),
                 Classes = { "swatch" },
             };
+            Control item = swatch;
+            if (custom.Contains(color))
+            {
+                // Own colors can be removed again with a small × that shows on hover.
+                var remove = new Button
+                {
+                    Classes = { "swatchRemove" },
+                    Content = new PathIcon { Data = Icons.Get("IconClose"), Width = 6, Height = 6 },
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                };
+                ToolTip.SetTip(remove, "Farbe entfernen");
+                remove.Click += (_, _) => RemoveCustomColor(color);
+                item = new Panel { Classes = { "customSwatch" }, Children = { swatch, remove } };
+            }
             ToolTip.SetTip(swatch, color.ToHex());
             swatch.PointerPressed += (_, _) =>
             {
@@ -167,7 +224,7 @@ public partial class EditorView : UserControl
                 }
             };
             _swatches.Add((swatch, color));
-            SwatchPanel.Children.Add(swatch);
+            SwatchPanel.Children.Add(item);
         }
         SwatchPanel.Children.Add(CreateColorPickerButton());
         // Keep the current color highlighted after rebuilding.
@@ -180,7 +237,8 @@ public partial class EditorView : UserControl
         {
             Color = AnnotationRenderer.ToColor(_canvas.Color),
             IsAlphaEnabled = false,
-            Width = 300,
+            IsAlphaVisible = false,
+            Width = 380,
         };
         view.ColorChanged += (_, e) =>
         {
@@ -214,6 +272,13 @@ public partial class EditorView : UserControl
         };
         ToolTip.SetTip(button, "Weitere Farben …");
         return button;
+    }
+
+    private void RemoveCustomColor(ArgbColor color)
+    {
+        _app.Settings.CustomColors.Remove(color.Value);
+        _app.SaveSettings();
+        BuildSwatches();
     }
 
     private void RememberCustomColor(ArgbColor color)
@@ -291,6 +356,7 @@ public partial class EditorView : UserControl
             }
             _canvas.ApplyStyleToSelection();
             UpdateSizeLabel();
+            RememberOptions();
         };
         PixelateStyleButton.Click += (_, _) => SetObscureStyle(ObscureStyle.Pixelate);
         BlurStyleButton.Click += (_, _) => SetObscureStyle(ObscureStyle.Blur);
@@ -329,6 +395,7 @@ public partial class EditorView : UserControl
             _canvas.EditSelected(change);
         }
         UpdateOptions();
+        RememberOptions();
     }
 
     private void SetObscureStyle(ObscureStyle style)
@@ -336,14 +403,15 @@ public partial class EditorView : UserControl
         _canvas.ObscureStyle = style;
         _canvas.ApplyStyleToSelection();
         UpdateOptions();
+        RememberOptions();
     }
 
     /// <summary>Shows the popup for the current tool/selection, fills in its values and places it under the tool.</summary>
     private void UpdateOptions()
     {
         var context = CurrentOptionsContext;
-        OptionsBar.IsVisible = context != OptionsContext.None;
-        if (context == OptionsContext.None) return;
+        OptionsBar.IsVisible = context != OptionsContext.None && !_optionsDismissed;
+        if (!OptionsBar.IsVisible) return;
 
         var scaling = Capture.Scaling;
         _updatingOptions = true;
@@ -537,7 +605,8 @@ public partial class EditorView : UserControl
     private void WireActions()
     {
         ToolTip.SetTip(InsertButton, $"Weitere Aufnahme einfügen ({CommandSymbol}I)");
-        ToolTip.SetTip(OcrButton, "Text erkennen (OCR)");
+        ToolTip.SetTip(OcrButton, "Gesamten Text erkennen (OCR)");
+        ToolTip.SetTip(QrButton, "QR-Code / Barcode lesen");
         ToolTip.SetTip(UndoButton, $"Rückgängig ({CommandSymbol}Z)");
         ToolTip.SetTip(RedoButton, AppController.IsMac ? "Wiederholen (⇧⌘Z)" : "Wiederholen (Strg+Y)");
         ToolTip.SetTip(CopyButton, $"In die Zwischenablage kopieren ({CommandSymbol}C)");
@@ -546,6 +615,11 @@ public partial class EditorView : UserControl
 
         InsertButton.Click += async (_, _) => await InsertCaptureAsync();
         OcrButton.Click += async (_, _) => await RecognizeTextAsync();
+        QrButton.Click += async (_, _) => await ReadCodesAsync();
+        OcrOpenLinkButton.Click += (_, _) =>
+        {
+            if (OcrOpenLinkButton.Tag is string link) AppController.OpenLink(link);
+        };
         OcrCloseButton.Click += (_, _) => OcrPanel.IsVisible = false;
         OcrCopyButton.Click += async (_, _) =>
         {
@@ -564,6 +638,12 @@ public partial class EditorView : UserControl
             ApplyFitZoom();
         };
         ActualSizeButton.Click += (_, _) => SetZoom(1);
+        ZoomInButton.Click += (_, _) => SetZoom(NextZoomStep(+1));
+        ZoomOutButton.Click += (_, _) => SetZoom(NextZoomStep(-1));
+        ToolTip.SetTip(ZoomInButton, $"Vergrößern ({CommandSymbol}+ oder {CommandSymbol} + Mausrad)");
+        ToolTip.SetTip(ZoomOutButton, $"Verkleinern ({CommandSymbol}−)");
+        ToolTip.SetTip(FitButton, $"Ins Fenster einpassen ({CommandSymbol}0)");
+        ToolTip.SetTip(ActualSizeButton, $"Originalgröße ({CommandSymbol}1)");
     }
 
     // ------------------------------------------------------------ tools & colors
@@ -572,8 +652,12 @@ public partial class EditorView : UserControl
     {
         CommitTextEdit();
         if (tool == EditorTool.Crop && _canvas.Tool != EditorTool.Crop) _toolBeforeCrop = _canvas.Tool;
+        if (tool == EditorTool.ColorPicker && _canvas.Tool != EditorTool.ColorPicker) _toolBeforePicker = _canvas.Tool;
+        _optionsDismissed = false;
         _canvas.Tool = tool;
-        if (tool != EditorTool.Select) _canvas.Select(null);
+        _canvas.StrokePoints = RememberedStroke(tool);
+        // The color picker keeps the selection, so a picked color can recolor it.
+        if (tool is not (EditorTool.Select or EditorTool.ColorPicker)) _canvas.Select(null);
         foreach (var (t, button) in _toolButtons) button.IsChecked = t == tool;
         _canvas.ToolCursor = new Cursor(tool switch
         {
@@ -615,13 +699,28 @@ public partial class EditorView : UserControl
     {
         _canvas.Color = color;
         foreach (var (swatch, c) in _swatches) swatch.Classes.Set("selected", c == color);
+        if (Memory.Color != color.Value)
+        {
+            Memory.Color = color.Value;
+            _app.SaveSettingsSoon();
+        }
     }
 
+    /// <summary>
+    /// A color picked from the screenshot becomes the drawing color (and recolors the
+    /// selection); the hex value goes to the clipboard, then the previous tool returns.
+    /// </summary>
     private async void OnColorPicked(ArgbColor color)
     {
-        var hex = color.ToHex();
+        var picked = color.WithAlpha(255);
+        SelectColor(picked);
+        _canvas.ApplyColorToSelection();
+        if (!_swatches.Any(s => s.Color == picked)) RememberCustomColor(picked);
+        SelectTool(_toolBeforePicker);
+
+        var hex = picked.ToHex();
         await SetClipboardTextAsync(hex);
-        ShowStatus($"Farbe {hex} kopiert");
+        ShowStatus($"Farbe {hex} übernommen und kopiert");
     }
 
     private async Task SetClipboardTextAsync(string text)
@@ -652,6 +751,124 @@ public partial class EditorView : UserControl
         _fitToWindow = false;
         _canvas.Zoom = Math.Clamp(zoom, 0.05, 16);
         UpdateStatus();
+    }
+
+    private static readonly double[] ZoomSteps = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8, 12, 16];
+
+    private double NextZoomStep(int direction)
+    {
+        var current = _canvas.Zoom;
+        return direction > 0
+            ? ZoomSteps.FirstOrDefault(z => z > current * 1.01, ZoomSteps[^1])
+            : ZoomSteps.LastOrDefault(z => z < current / 1.01, ZoomSteps[0]);
+    }
+
+    /// <summary>⌘/Ctrl + mouse wheel zooms towards the pointer; plain wheel keeps scrolling.</summary>
+    private void OnScrollerWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(this.CommandModifier())) return;
+        ZoomAt(_canvas.Zoom * Math.Pow(1.15, e.Delta.Y), e.GetPosition(_canvas), e.GetPosition(Scroller));
+        e.Handled = true;
+    }
+
+    /// <summary>Zooms so the image point under <paramref name="pointerOnCanvas"/> stays under the pointer.</summary>
+    private void ZoomAt(double zoom, Point pointerOnCanvas, Point pointerOnScroller)
+    {
+        var old = _canvas.Zoom;
+        SetZoom(zoom);
+        var factor = _canvas.Zoom / old;
+        Dispatcher.UIThread.Post(() =>
+        {
+            var target = new Point(pointerOnCanvas.X * factor, pointerOnCanvas.Y * factor);
+            if (_canvas.TranslatePoint(target, Scroller) is not { } now) return;
+            Scroller.Offset = new Vector(
+                Math.Max(0, Scroller.Offset.X + now.X - pointerOnScroller.X),
+                Math.Max(0, Scroller.Offset.Y + now.Y - pointerOnScroller.Y));
+        }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>Pins the canvas at its current place so it can grow during a drag without recentering.</summary>
+    private void PinCanvasForDrag()
+    {
+        _dragging = true;
+        var b = CanvasFrame.Bounds;
+        CanvasFrame.HorizontalAlignment = HorizontalAlignment.Left;
+        CanvasFrame.VerticalAlignment = VerticalAlignment.Top;
+        CanvasFrame.Margin = new Thickness(b.X, b.Y, 32, 32);
+    }
+
+    private void UnpinCanvas()
+    {
+        _dragging = false;
+        CanvasFrame.HorizontalAlignment = HorizontalAlignment.Center;
+        CanvasFrame.VerticalAlignment = VerticalAlignment.Center;
+        CanvasFrame.Margin = new Thickness(32);
+        if (_fitToWindow) Dispatcher.UIThread.Post(ApplyFitZoom);
+    }
+
+    // ------------------------------------------------------------ tool memory
+
+    private ToolMemory Memory => _app.Settings.Tools;
+
+    /// <summary>Starts every tool the way it was left last time (also across restarts).</summary>
+    private void LoadToolMemory()
+    {
+        var m = Memory;
+        var defaults = _canvas.TextDefaults;
+        defaults.FontFamily = m.FontFamily;
+        defaults.Bold = m.Bold;
+        defaults.Italic = m.Italic;
+        defaults.Underline = m.Underline;
+        defaults.Strikethrough = m.Strikethrough;
+        defaults.Style = m.TextStyle;
+        _canvas.ObscureStyle = m.ObscureStyle;
+        _canvas.ObscureStrength = m.ObscureStrength;
+        _canvas.Color = ArgbColor.FromUInt(m.Color);
+    }
+
+    private double RememberedStroke(EditorTool tool) => tool switch
+    {
+        EditorTool.Text => Memory.TextSize,
+        EditorTool.Counter => Memory.CounterSize,
+        _ => Memory.StrokeByTool.TryGetValue(tool.ToString(), out var v) ? v : ToolSizes.DefaultStroke,
+    };
+
+    /// <summary>Stores the current options of the tool (or selected annotation type).</summary>
+    private void RememberOptions()
+    {
+        var m = Memory;
+        var tool = _canvas.Selected switch
+        {
+            ArrowAnnotation => EditorTool.Arrow,
+            RectangleAnnotation => EditorTool.Rectangle,
+            EllipseAnnotation => EditorTool.Ellipse,
+            TextAnnotation => EditorTool.Text,
+            CounterAnnotation => EditorTool.Counter,
+            _ => _textDraft is not null ? EditorTool.Text : _canvas.Tool,
+        };
+        switch (tool)
+        {
+            case EditorTool.Text:
+                m.TextSize = _canvas.StrokePoints;
+                break;
+            case EditorTool.Counter:
+                m.CounterSize = _canvas.StrokePoints;
+                break;
+            case EditorTool.Arrow or EditorTool.Rectangle or EditorTool.Ellipse:
+                m.StrokeByTool[tool.ToString()] = _canvas.StrokePoints;
+                break;
+        }
+        var t = _canvas.TextDefaults;
+        m.FontFamily = t.FontFamily;
+        m.Bold = t.Bold;
+        m.Italic = t.Italic;
+        m.Underline = t.Underline;
+        m.Strikethrough = t.Strikethrough;
+        m.TextStyle = t.Style;
+        m.ObscureStyle = _canvas.ObscureStyle;
+        m.ObscureStrength = _canvas.ObscureStrength;
+        m.Color = _canvas.Color.Value;
+        _app.SaveSettingsSoon();
     }
 
     // ------------------------------------------------------------ text editing
@@ -693,6 +910,7 @@ public partial class EditorView : UserControl
 
         _textEditor = editor;
         _textDraft = draft;
+        _optionsDismissed = false;
         _canvas.EditingText = existing;
         TextLayer.Children.Add(editor);
         UpdateTextEditorAppearance();
@@ -845,16 +1063,26 @@ public partial class EditorView : UserControl
         ShowStatus("Aufnahme eingefügt – zum Verschieben ziehen");
     }
 
-    private async Task RecognizeTextAsync()
+    /// <summary>
+    /// Recognizes the text of the whole visible image or of a marked region and shows it in
+    /// the side box. A marked region is also checked for QR codes, whose content comes first.
+    /// </summary>
+    private async Task RecognizeTextAsync(IntRect? region = null)
     {
         CommitTextEdit();
-        OcrPanel.IsVisible = true;
-        OcrText.Text = "";
-        OcrStatus.Text = "Text wird erkannt …";
+        ShowResultPanel("Erkannter Text", region is null ? "Text wird erkannt …" : "Text im markierten Bereich wird erkannt …");
         OcrButton.IsEnabled = false;
         try
         {
-            var text = await _app.RecognizeTextAsync(Capture);
+            var textTask = _app.RecognizeTextAsync(Capture, region);
+            var codesTask = region is null ? Task.FromResult<IReadOnlyList<DecodedCode>>([]) : _app.ReadCodesAsync(Capture, region);
+            var text = await textTask;
+            var codes = await codesTask;
+            if (codes.Count > 0)
+            {
+                await ShowCodesAsync(codes, text);
+                return;
+            }
             OcrText.Text = text;
             if (text.Length == 0)
             {
@@ -876,6 +1104,54 @@ public partial class EditorView : UserControl
         {
             OcrButton.IsEnabled = true;
         }
+    }
+
+    private async Task ReadCodesAsync()
+    {
+        CommitTextEdit();
+        ShowResultPanel("QR-Code", "QR-Codes werden gesucht …");
+        QrButton.IsEnabled = false;
+        try
+        {
+            var codes = await _app.ReadCodesAsync(Capture);
+            if (codes.Count == 0)
+            {
+                OcrStatus.Text = "Kein QR-Code oder Barcode gefunden.";
+                return;
+            }
+            await ShowCodesAsync(codes, null);
+        }
+        catch (Exception e)
+        {
+            CrashLog.Write("QR", e);
+            OcrStatus.Text = $"QR-Code konnte nicht gelesen werden: {e.Message}";
+        }
+        finally
+        {
+            QrButton.IsEnabled = true;
+        }
+    }
+
+    private void ShowResultPanel(string title, string status)
+    {
+        OcrPanel.IsVisible = true;
+        OcrTitle.Text = title;
+        OcrText.Text = "";
+        OcrStatus.Text = status;
+        OcrOpenLinkButton.IsVisible = false;
+    }
+
+    /// <summary>Shows decoded codes (plus any recognized text), copies them and offers to open a link.</summary>
+    private async Task ShowCodesAsync(IReadOnlyList<DecodedCode> codes, string? text)
+    {
+        OcrTitle.Text = codes.Count == 1 ? codes[0].Format : $"{codes.Count} Codes";
+        var content = string.Join("\n\n", codes.Select(c => c.Text));
+        OcrText.Text = string.IsNullOrEmpty(text) ? content : $"{content}\n\n{text}";
+        await SetClipboardTextAsync(content);
+        OcrStatus.Text = codes.Count == 1 ? "Inhalt in die Zwischenablage kopiert." : "Inhalte in die Zwischenablage kopiert.";
+        var link = codes.FirstOrDefault(c => c.IsLink);
+        OcrOpenLinkButton.IsVisible = link is not null;
+        OcrOpenLinkButton.Tag = link?.Text.Trim();
     }
 
     private void Undo()
@@ -948,8 +1224,8 @@ public partial class EditorView : UserControl
                 case Key.I: _ = InsertCaptureAsync(); return true;
                 case Key.D0: _fitToWindow = true; ApplyFitZoom(); return true;
                 case Key.D1: SetZoom(1); return true;
-                case Key.OemPlus or Key.Add: SetZoom(_canvas.Zoom * 1.25); return true;
-                case Key.OemMinus or Key.Subtract: SetZoom(_canvas.Zoom / 1.25); return true;
+                case Key.OemPlus or Key.Add: SetZoom(NextZoomStep(+1)); return true;
+                case Key.OemMinus or Key.Subtract: SetZoom(NextZoomStep(-1)); return true;
             }
             return false;
         }

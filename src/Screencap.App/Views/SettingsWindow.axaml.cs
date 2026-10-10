@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Screencap.App.Services;
 using Screencap.Core.Settings;
@@ -32,15 +33,30 @@ public partial class SettingsWindow : Window
         JpegQuality.Value = settings.JpegQuality;
         UpdateJpegControls();
         LoadBackground(settings.CanvasBackground);
-        RegionHotkey.Text = app.FormatHotkey(settings.RegionHotkey);
-        FullscreenHotkey.Text = app.FormatHotkey(settings.FullscreenHotkey);
-
-        if (app.FailedHotkeys.Count > 0)
+        GlassIntensity.Value = settings.GlassIntensity;
+        UpdateGlassText();
+        GlassIntensity.ValueChanged += (_, _) =>
         {
-            HotkeyWarning.Text = "Bereits von einer anderen App oder dem System belegt: " +
-                                 string.Join(", ", app.FailedHotkeys.Select(app.FormatHotkey));
-            HotkeyWarning.IsVisible = true;
-        }
+            settings.GlassIntensity = (int)Math.Round(GlassIntensity.Value);
+            UpdateGlassText();
+            app.SaveSettings();
+        };
+
+        RegionHotkey.Click += (_, _) => StartRecording(RegionHotkey, h => settings.RegionHotkey = h);
+        FullscreenHotkey.Click += (_, _) => StartRecording(FullscreenHotkey, h => settings.FullscreenHotkey = h);
+        OcrHotkey.Click += (_, _) => StartRecording(OcrHotkey, h => settings.OcrHotkey = h);
+        ResetHotkeys.Click += (_, _) =>
+        {
+            CancelRecording();
+            settings.RegionHotkey = AppSettings.DefaultRegionHotkey();
+            settings.FullscreenHotkey = AppSettings.DefaultFullscreenHotkey();
+            settings.OcrHotkey = AppSettings.DefaultOcrHotkey();
+            app.ApplyHotkeySettings();
+            ShowHotkeys();
+        };
+        AddHandler(KeyDownEvent, OnRecordKey, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        Closed += (_, _) => CancelRecording();
+        ShowHotkeys();
 
         CopyAfterCapture.IsCheckedChanged += (_, _) => Update(s => s.CopyToClipboardAfterCapture = CopyAfterCapture.IsChecked == true);
         RestoreTabs.IsCheckedChanged += (_, _) => Update(s => s.RestoreTabsOnStartup = RestoreTabs.IsChecked == true);
@@ -87,6 +103,69 @@ public partial class SettingsWindow : Window
             Directory.CreateDirectory(folder);
             await Launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(folder));
         };
+    }
+
+    private Button? _recordingButton;
+    private Action<Hotkey>? _recordingApply;
+
+    private void UpdateGlassText() =>
+        GlassIntensityText.Text = GlassIntensity.Value < 1 ? "aus" : $"{GlassIntensity.Value:0} %";
+
+    private void ShowHotkeys()
+    {
+        var s = _app.Settings;
+        RegionHotkey.Content = _app.FormatHotkey(s.RegionHotkey);
+        FullscreenHotkey.Content = _app.FormatHotkey(s.FullscreenHotkey);
+        OcrHotkey.Content = _app.FormatHotkey(s.OcrHotkey);
+        HotkeyWarning.IsVisible = _app.FailedHotkeys.Count > 0;
+        HotkeyWarning.Text = "Bereits von einer anderen App oder dem System belegt: " +
+                             string.Join(", ", _app.FailedHotkeys.Select(_app.FormatHotkey));
+    }
+
+    /// <summary>The next key combination pressed becomes the new hotkey.</summary>
+    private void StartRecording(Button button, Action<Hotkey> apply)
+    {
+        CancelRecording();
+        // Global hotkeys would fire instead of reaching this window.
+        _app.SuspendHotkeys();
+        _recordingButton = button;
+        _recordingApply = apply;
+        button.Content = "Tastenkombination drücken …";
+        button.Classes.Add("accent");
+    }
+
+    private void CancelRecording()
+    {
+        if (_recordingButton is null) return;
+        _recordingButton.Classes.Remove("accent");
+        _recordingButton = null;
+        _recordingApply = null;
+        _app.RegisterHotkeys();
+        ShowHotkeys();
+    }
+
+    private void OnRecordKey(object? sender, KeyEventArgs e)
+    {
+        if (_recordingButton is null || _recordingApply is null) return;
+        e.Handled = true;
+        if (e.Key == Key.Escape)
+        {
+            CancelRecording();
+            return;
+        }
+        if (HotkeyMapping.FromKey(e.Key) is not { } key) return; // modifier alone or unsupported key
+
+        var modifiers = HotkeyMapping.FromKeyModifiers(e.KeyModifiers);
+        // Without a modifier only function keys and Print Screen make sense as global hotkeys.
+        if (modifiers == HotkeyModifiers.None && key is not (>= HotkeyKey.F1 and <= HotkeyKey.F12 or HotkeyKey.PrintScreen))
+            return;
+
+        _recordingApply(new Hotkey(modifiers, key));
+        _recordingButton.Classes.Remove("accent");
+        _recordingButton = null;
+        _recordingApply = null;
+        _app.ApplyHotkeySettings();
+        ShowHotkeys();
     }
 
     private const int CustomBackgroundIndex = 3;

@@ -185,3 +185,43 @@ public class EncodingTests
         Assert.False(ScreenshotFiles.IsScreencapFile("Screencap 2026-01-01 10-00-00.gif"));
     }
 }
+
+public class GrowthAndMemoryTests
+{
+    [Fact]
+    public void AnyElementPastTheEdge_GrowsContent_ButNotPixelate()
+    {
+        var capture = new Capture(PixelBufferTests.Gradient(100, 80), 1);
+        capture.Annotations.Add(new RectangleAnnotation { Rect = new RectD(80, 60, 50, 40) });
+        capture.Annotations.Add(new PixelateAnnotation { Rect = new RectD(-50, -50, 40, 40) });
+        Assert.Equal(new IntRect(0, 0, 130, 100), capture.ContentBounds);
+    }
+
+    [Fact]
+    public void ToolMemory_SurvivesSettingsRoundTrip()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"screencap-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new Settings.SettingsStore(path);
+            var settings = new Settings.AppSettings();
+            settings.Tools.StrokeByTool["Arrow"] = 7.5;
+            settings.Tools.Italic = true;
+            settings.Tools.ObscureStyle = ObscureStyle.Blur;
+            store.Save(settings);
+
+            var loaded = store.Load();
+            Assert.Equal(7.5, loaded.Tools.StrokeByTool["Arrow"]);
+            Assert.True(loaded.Tools.Italic);
+            Assert.False(loaded.Tools.Bold);
+            Assert.Equal(ObscureStyle.Blur, loaded.Tools.ObscureStyle);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void NewText_IsNotBoldByDefault() => Assert.False(new TextAnnotation().Bold);
+}

@@ -112,4 +112,24 @@
   <Style Selector="Border.layer.hidden TextBlock">
     <Setter Property="Opacity" Value="0.45" />
   </Style>
+
+  <!-- Removable custom color swatches. -->
+  <Style Selector="Button.swatchRemove">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0,-5,-3,0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Background" Value="#E0303034" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Panel.customSwatch:pointerover Button.swatchRemove">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
 </Styles>
