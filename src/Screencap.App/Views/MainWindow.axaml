@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Screencap.App.Views.MainWindow"
+        Title="Screencap"
+        Width="1180" Height="780"
+        MinWidth="720" MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="46"
+        Background="{DynamicResource ScChromeBrush}">
+  <DockPanel>
+    <!-- Title bar with tabs (the window's own title bar is hidden). -->
+    <Grid x:Name="TitleBar" DockPanel.Dock="Top" Height="46" ColumnDefinitions="Auto,*,Auto">
+      <Border x:Name="DragArea" Grid.ColumnSpan="3" Background="Transparent" />
+      <Border x:Name="LeftInset" />
+      <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                    VerticalAlignment="Center" HorizontalAlignment="Left">
+        <StackPanel x:Name="TabStrip" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0" />
+      </ScrollViewer>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="SettingsButton" Classes="flat" ToolTip.Tip="Einstellungen">
+          <PathIcon Data="{StaticResource IconSettings}" />
+        </Button>
+        <Border x:Name="RightInset" />
+      </StackPanel>
+    </Grid>
+
+    <Panel x:Name="ContentHost">
+      <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+        <PathIcon Data="{StaticResource IconCamera}" Width="44" Height="44" Opacity="0.35" />
+        <TextBlock Text="Noch keine Screenshots" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock x:Name="EmptyHint" Foreground="{DynamicResource ScMutedBrush}" HorizontalAlignment="Center" />
+        <Button x:Name="CaptureButton" Classes="accent" Content="Bereich aufnehmen" HorizontalAlignment="Center" />
+      </StackPanel>
+    </Panel>
+  </DockPanel>
+</Window>

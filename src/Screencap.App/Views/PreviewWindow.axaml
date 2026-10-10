@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Screencap.App.Views.PreviewWindow"
+        Title="Screencap"
+        WindowDecorations="None"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="Manual"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        RequestedThemeVariant="Dark"
+        Opacity="0">
+  <Border Background="#F2232427" CornerRadius="12" Padding="8"
+          BorderBrush="#33FFFFFF" BorderThickness="1">
+    <StackPanel Spacing="8">
+      <Panel>
+        <Border x:Name="ImageHost" CornerRadius="6" ClipToBounds="True" Cursor="SizeAll"
+                ToolTip.Tip="Ziehen zum Verschieben, Doppelklick zum Bearbeiten">
+          <Image x:Name="Thumbnail" Stretch="Uniform" />
+        </Border>
+        <Border x:Name="Toast" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="#E0101010" CornerRadius="8" Padding="12,6">
+          <TextBlock x:Name="ToastText" Foreground="White" FontWeight="SemiBold" />
+        </Border>
+      </Panel>
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Button x:Name="EditButton" Classes="accent" ToolTip.Tip="Im Hauptfenster bearbeiten (Enter)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" />
+            <TextBlock Text="Bearbeiten" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="12,0,0,0">
+          <Button x:Name="CopyButton" Classes="tool"><PathIcon Data="{StaticResource IconCopy}" Width="15" Height="15" /></Button>
+          <Button x:Name="SaveButton" Classes="tool"><PathIcon Data="{StaticResource IconSave}" Width="15" Height="15" /></Button>
+          <Button x:Name="OcrButton" Classes="tool"><PathIcon Data="{StaticResource IconOcr}" Width="15" Height="15" /></Button>
+          <Button x:Name="PinButton" Classes="tool" ToolTip.Tip="Anpinnen (P)"><PathIcon Data="{StaticResource IconPin}" Width="15" Height="15" /></Button>
+          <Button x:Name="CloseButton" Classes="tool" ToolTip.Tip="Schließen (Esc)"><PathIcon Data="{StaticResource IconClose}" Width="15" Height="15" /></Button>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </Border>
+</Window>

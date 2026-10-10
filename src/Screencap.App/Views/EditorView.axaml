@@ -1,0 +1,171 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Screencap.App.Views.EditorView">
+  <DockPanel>
+    <!-- Toolbar: groups wrap into a second row when the window is narrow. -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource ScChromeBrush}" Padding="10,6"
+            BorderBrush="{DynamicResource ScDividerBrush}" BorderThickness="0,0,0,1">
+      <WrapPanel ItemSpacing="8" LineSpacing="6">
+        <Border Classes="group">
+          <StackPanel x:Name="ToolPanel" Orientation="Horizontal" Spacing="1" />
+        </Border>
+        <!-- Recognition: mark text, all text, QR codes -->
+        <Border Classes="group">
+          <StackPanel x:Name="RecognitionPanel" Orientation="Horizontal" Spacing="1">
+            <Button x:Name="OcrButton" Classes="flat"><PathIcon Data="{StaticResource IconOcrAll}" /></Button>
+            <Button x:Name="QrButton" Classes="flat"><PathIcon Data="{StaticResource IconQr}" /></Button>
+          </StackPanel>
+        </Border>
+        <Border Classes="group" Padding="6,3">
+          <StackPanel x:Name="SwatchPanel" Orientation="Horizontal" VerticalAlignment="Center" />
+        </Border>
+        <Border Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="1">
+            <Button x:Name="InsertButton" Classes="flat"><PathIcon Data="{StaticResource IconInsert}" /></Button>
+            <ToggleButton x:Name="LayersButton" Classes="flat"><PathIcon Data="{StaticResource IconLayers}" /></ToggleButton>
+            <Border Classes="divider" Margin="3,6" />
+            <Button x:Name="UndoButton" Classes="flat"><PathIcon Data="{StaticResource IconUndo}" /></Button>
+            <Button x:Name="RedoButton" Classes="flat"><PathIcon Data="{StaticResource IconRedo}" /></Button>
+            <Border Classes="divider" Margin="3,6" />
+            <Button x:Name="PinButton" Classes="flat" ToolTip.Tip="Anpinnen (P)"><PathIcon Data="{StaticResource IconPin}" /></Button>
+            <Button x:Name="SaveAsButton" Classes="flat"><PathIcon Data="{StaticResource IconSaveAs}" /></Button>
+            <Button x:Name="SaveButton" Classes="flat"><PathIcon Data="{StaticResource IconSave}" /></Button>
+          </StackPanel>
+        </Border>
+        <Button x:Name="CopyButton" Classes="accent" Padding="12,0" CornerRadius="9" VerticalAlignment="Stretch">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" />
+            <TextBlock Text="Kopieren" />
+          </StackPanel>
+        </Button>
+      </WrapPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource ScChromeBrush}" Padding="12,3"
+            BorderBrush="{DynamicResource ScDividerBrush}" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource ScMutedBrush}" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+          <Button x:Name="ZoomOutButton" Classes="flat" Padding="4" MinHeight="24" MinWidth="24">
+            <PathIcon Data="{StaticResource IconMinus}" Width="12" Height="12" />
+          </Button>
+          <TextBlock x:Name="ZoomText" VerticalAlignment="Center" FontSize="12" MinWidth="44" TextAlignment="Center"
+                     Foreground="{DynamicResource ScMutedBrush}" />
+          <Button x:Name="ZoomInButton" Classes="flat" Padding="4" MinHeight="24" MinWidth="24">
+            <PathIcon Data="{StaticResource IconPlus}" Width="12" Height="12" />
+          </Button>
+          <Button x:Name="FitButton" Classes="flat" Content="Einpassen" FontSize="12" Padding="8,2" MinHeight="24" />
+          <Button x:Name="ActualSizeButton" Classes="flat" Content="100 %" FontSize="12" Padding="8,2" MinHeight="24" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- OCR result -->
+    <Border x:Name="OcrPanel" DockPanel.Dock="Right" Width="320" IsVisible="False"
+            Background="{DynamicResource ScChromeBrush}"
+            BorderBrush="{DynamicResource ScDividerBrush}" BorderThickness="1,0,0,0">
+      <DockPanel Margin="14,10,14,14">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+          <TextBlock x:Name="OcrTitle" Text="Erkannter Text" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+          <Button x:Name="OcrCloseButton" Grid.Column="1" Classes="flat" ToolTip.Tip="Schließen">
+            <PathIcon Data="{StaticResource IconClose}" Width="12" Height="12" />
+          </Button>
+        </Grid>
+        <TextBlock x:Name="OcrStatus" DockPanel.Dock="Top" FontSize="12" Margin="0,2,0,8"
+                   Foreground="{DynamicResource ScMutedBrush}" TextWrapping="Wrap" />
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,10,0,0">
+          <Button x:Name="OcrOpenLinkButton" Content="Link öffnen" HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center" IsVisible="False" />
+          <Button x:Name="OcrCopyButton" Grid.Column="1" Classes="accent" HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Center" Content="Kopieren" />
+        </Grid>
+        <TextBox x:Name="OcrText" AcceptsReturn="True" TextWrapping="Wrap" FontSize="13"
+                 VerticalContentAlignment="Top" />
+      </DockPanel>
+    </Border>
+
+    <!-- Layers -->
+    <Border x:Name="LayersPanel" DockPanel.Dock="Right" Width="250" IsVisible="False"
+            Background="{DynamicResource ScChromeBrush}"
+            BorderBrush="{DynamicResource ScDividerBrush}" BorderThickness="1,0,0,0">
+      <DockPanel Margin="10,10,10,10">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,6">
+          <TextBlock Text="Ebenen" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+          <Button x:Name="LayersCloseButton" Grid.Column="1" Classes="flat" ToolTip.Tip="Schließen">
+            <PathIcon Data="{StaticResource IconClose}" Width="12" Height="12" />
+          </Button>
+        </Grid>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="2" Margin="0,8,0,0">
+          <Button x:Name="LayerUpButton" Classes="flat" ToolTip.Tip="Nach vorne"><PathIcon Data="{StaticResource IconUp}" /></Button>
+          <Button x:Name="LayerDownButton" Classes="flat" ToolTip.Tip="Nach hinten"><PathIcon Data="{StaticResource IconDown}" /></Button>
+          <Button x:Name="LayerDeleteButton" Classes="flat" ToolTip.Tip="Löschen (⌫)"><PathIcon Data="{StaticResource IconDelete}" /></Button>
+        </StackPanel>
+        <TextBlock x:Name="LayersEmpty" DockPanel.Dock="Top" Text="Noch keine Markierungen." FontSize="12"
+                   Foreground="{DynamicResource ScMutedBrush}" Margin="4,4" />
+        <ScrollViewer>
+          <StackPanel x:Name="LayerList" Spacing="2" />
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Panel>
+      <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                    Background="{DynamicResource ScCanvasBrush}">
+        <Border x:Name="CanvasFrame" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32"
+                BoxShadow="0 6 28 0 #45000000">
+          <Panel x:Name="CanvasHost">
+            <Canvas x:Name="TextLayer" />
+          </Panel>
+        </Border>
+      </ScrollViewer>
+
+      <!-- Tool options: pops up under the active tool, only where it makes sense (like Shottr). -->
+      <Border x:Name="OptionsBar" Classes="popup" HorizontalAlignment="Left" VerticalAlignment="Top"
+              Margin="10,8,0,0" IsVisible="False">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <StackPanel x:Name="ObscureStylePanel" Orientation="Horizontal" Spacing="1">
+            <ToggleButton x:Name="PixelateStyleButton" Classes="flat" ToolTip.Tip="Verpixeln">
+              <PathIcon Data="{StaticResource IconPixelate}" />
+            </ToggleButton>
+            <ToggleButton x:Name="BlurStyleButton" Classes="flat" ToolTip.Tip="Verwischen">
+              <PathIcon Data="{StaticResource IconBlur}" />
+            </ToggleButton>
+            <Border Classes="divider" Margin="4,6" />
+          </StackPanel>
+          <StackPanel x:Name="TextOptionsPanel" Orientation="Horizontal" Spacing="1">
+            <ComboBox x:Name="FontCombo" Width="170" VerticalAlignment="Center" Margin="0,0,6,0"
+                      ToolTip.Tip="Schriftart" MaxDropDownHeight="420" />
+            <ToggleButton x:Name="BoldButton" Classes="flat textStyle" ToolTip.Tip="Fett">
+              <TextBlock Text="B" FontWeight="Bold" />
+            </ToggleButton>
+            <ToggleButton x:Name="ItalicButton" Classes="flat textStyle" ToolTip.Tip="Kursiv">
+              <TextBlock Text="I" FontStyle="Italic" FontFamily="Georgia, Times New Roman, serif" />
+            </ToggleButton>
+            <ToggleButton x:Name="UnderlineButton" Classes="flat textStyle" ToolTip.Tip="Unterstrichen">
+              <TextBlock Text="U" TextDecorations="Underline" />
+            </ToggleButton>
+            <ToggleButton x:Name="StrikeButton" Classes="flat textStyle" ToolTip.Tip="Durchgestrichen">
+              <TextBlock Text="S" TextDecorations="Strikethrough" />
+            </ToggleButton>
+            <Border Classes="divider" Margin="4,6" />
+            <ToggleButton x:Name="OutlineStyleButton" Classes="flat" ToolTip.Tip="Mit Kontur (auf jedem Hintergrund lesbar)">
+              <TextBlock Text="Kontur" FontSize="12" />
+            </ToggleButton>
+            <ToggleButton x:Name="PlainStyleButton" Classes="flat" ToolTip.Tip="Schlicht">
+              <TextBlock Text="Schlicht" FontSize="12" />
+            </ToggleButton>
+            <ToggleButton x:Name="FilledStyleButton" Classes="flat" ToolTip.Tip="Mit Hintergrund">
+              <TextBlock Text="Box" FontSize="12" />
+            </ToggleButton>
+            <Border Classes="divider" Margin="4,6" />
+          </StackPanel>
+          <TextBlock x:Name="SizeLabel" VerticalAlignment="Center" FontSize="12" MinWidth="62"
+                     Foreground="{DynamicResource ScMutedBrush}" Margin="4,0,0,0" />
+          <Slider x:Name="SizeSlider" Width="120" VerticalAlignment="Center" Margin="0,-6,4,-6"
+                  SmallChange="0.5" LargeChange="1" />
+        </StackPanel>
+      </Border>
+    </Panel>
+  </DockPanel>
+</UserControl>
