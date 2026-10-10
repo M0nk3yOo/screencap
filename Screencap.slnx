@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Screencap.App/Screencap.App.csproj" />
+    <Project Path="src/Screencap.Core/Screencap.Core.csproj" />
+    <Project Path="src/Screencap.Platform.MacOS/Screencap.Platform.MacOS.csproj" />
+    <Project Path="src/Screencap.Platform.Windows/Screencap.Platform.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Screencap.App.Tests/Screencap.App.Tests.csproj" />
+    <Project Path="tests/Screencap.Core.Tests/Screencap.Core.Tests.csproj" />
+  </Folder>
+</Solution>

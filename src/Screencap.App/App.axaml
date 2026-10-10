@@ -1,0 +1,39 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Screencap.App.App"
+             Name="Screencap"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Screencap/Icons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+      <!-- Editor chrome, follows the system light/dark setting. -->
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="ScChromeBrush" Color="#F4F4F6" />
+          <SolidColorBrush x:Key="ScCanvasBrush" Color="#E3E3E8" />
+          <SolidColorBrush x:Key="ScGroupBrush" Color="#E8E8ED" />
+          <SolidColorBrush x:Key="ScTabSelectedBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="ScTabHoverBrush" Color="#E9E9EE" />
+          <SolidColorBrush x:Key="ScDividerBrush" Color="#D6D6DC" />
+          <SolidColorBrush x:Key="ScMutedBrush" Color="#6E6E78" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="ScChromeBrush" Color="#2B2B2F" />
+          <SolidColorBrush x:Key="ScCanvasBrush" Color="#1C1C1F" />
+          <SolidColorBrush x:Key="ScGroupBrush" Color="#38383D" />
+          <SolidColorBrush x:Key="ScTabSelectedBrush" Color="#46464C" />
+          <SolidColorBrush x:Key="ScTabHoverBrush" Color="#38383D" />
+          <SolidColorBrush x:Key="ScDividerBrush" Color="#404046" />
+          <SolidColorBrush x:Key="ScMutedBrush" Color="#9A9AA4" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+    <StyleInclude Source="avares://Screencap/Styles.axaml" />
+  </Application.Styles>
+</Application>

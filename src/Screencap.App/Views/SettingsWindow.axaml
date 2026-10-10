@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Screencap.App.Views.SettingsWindow"
+        Title="Screencap – Einstellungen"
+        Width="540" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="22" Spacing="20">
+    <StackPanel Spacing="8">
+      <TextBlock Text="Nach der Aufnahme" FontWeight="SemiBold" FontSize="15" />
+      <CheckBox x:Name="CopyAfterCapture" Content="Automatisch in die Zwischenablage kopieren" />
+      <CheckBox x:Name="AutoSave" Content="Jeden Screenshot automatisch im Speicherort sichern" />
+      <CheckBox x:Name="RestoreTabs" Content="Reiter beim nächsten Start wiederherstellen" />
+      <TextBlock Text="Offene Screenshots samt Markierungen werden gespeichert und beim Start wieder geöffnet."
+                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0" />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Speicherort" FontWeight="SemiBold" FontSize="15" />
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+        <TextBox x:Name="SaveFolder" IsReadOnly="True" PlaceholderText="Noch nicht festgelegt – wird beim ersten Speichern abgefragt" />
+        <Button x:Name="ChooseFolder" Grid.Column="1" Content="Ändern …" />
+        <Button x:Name="OpenFolder" Grid.Column="2" Content="Öffnen" />
+      </Grid>
+      <TextBlock Text="Dateinamen: „Screencap JJJJ-MM-TT HH-MM-SS.png“ bzw. „.jpg“"
+                 Opacity="0.6" FontSize="12" />
+      <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
+        <TextBlock Text="Format" VerticalAlignment="Center" Width="80" />
+        <RadioButton x:Name="FormatPng" GroupName="Format" Content="PNG (verlustfrei)" />
+        <RadioButton x:Name="FormatJpeg" GroupName="Format" Content="JPG (kleiner)" />
+      </StackPanel>
+      <StackPanel x:Name="JpegQualityRow" Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="JPG-Qualität" VerticalAlignment="Center" Width="80" />
+        <Slider x:Name="JpegQuality" Minimum="40" Maximum="100" Width="200" SmallChange="5" LargeChange="10" />
+        <TextBlock x:Name="JpegQualityText" VerticalAlignment="Center" Width="40" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Hintergrund" FontWeight="SemiBold" FontSize="15" />
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <ComboBox x:Name="BackgroundMode" Width="200">
+          <ComboBoxItem Content="Transparent" />
+          <ComboBoxItem Content="Weiß" />
+          <ComboBoxItem Content="Schwarz" />
+          <ComboBoxItem Content="Eigene Farbe" />
+        </ComboBox>
+        <ColorPicker x:Name="BackgroundColor" IsAlphaEnabled="False" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock Text="Für Flächen, die beim Verschieben eingefügter Bilder neben dem Screenshot entstehen. Transparent bleibt in PNG erhalten; JPG bekommt Weiß."
+                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Aufräumen" FontWeight="SemiBold" FontSize="15" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <CheckBox x:Name="DeleteOld" Content="Screenshots löschen nach" VerticalAlignment="Center" />
+        <NumericUpDown x:Name="DeleteDays" Minimum="1" Maximum="3650" Increment="1" FormatString="0" Width="130" />
+        <TextBlock Text="Tagen" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock Text="Betrifft nur Dateien im Speicherort, die Screencap selbst angelegt hat. Andere Dateien bleiben unberührt."
+                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Tastenkürzel" FontWeight="SemiBold" FontSize="15" />
+      <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" RowSpacing="6">
+        <TextBlock Text="Bereich aufnehmen" />
+        <TextBlock x:Name="RegionHotkey" Grid.Column="1" FontWeight="SemiBold" />
+        <TextBlock Grid.Row="1" Text="Vollbild aufnehmen" />
+        <TextBlock x:Name="FullscreenHotkey" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" />
+      </Grid>
+      <TextBlock x:Name="HotkeyWarning" Foreground="#E5484D" TextWrapping="Wrap" FontSize="12" IsVisible="False" />
+    </StackPanel>
+  </StackPanel>
+</Window>
