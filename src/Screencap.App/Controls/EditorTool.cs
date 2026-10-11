@@ -4,6 +4,7 @@ internal enum EditorTool
 {
     Select,
     Crop,
+    Freehand,
     Arrow,
     Rectangle,
     Ellipse,
@@ -12,6 +13,7 @@ internal enum EditorTool
     Counter,
     Pixelate,
     Spotlight,
+    Magnifier,
     TextRecognition,
     ColorPicker,
 }
@@ -23,12 +25,24 @@ internal enum EditorTool
 internal static class ToolSizes
 {
     public const double MinStroke = 1;
-    public const double MaxStroke = 12;
+    public const double MaxStroke = 24;
     public const double DefaultStroke = 3.5;
 
     public const double MinStrength = 1;
     public const double MaxStrength = 10;
     public const double DefaultStrength = 5;
+
+    /// <summary>Starting width per pen type, before the user changed it.</summary>
+    public static double DefaultFor(Core.Annotations.PenType pen) => pen switch
+    {
+        Core.Annotations.PenType.Highlighter => 9,
+        Core.Annotations.PenType.Outline => 4,
+        _ => 2.5,
+    };
+
+    public const double MinZoom = 1.5;
+    public const double MaxZoom = 6;
+    public const double DefaultZoom = 2;
 
     public static double FontFor(double stroke) => 10 + stroke * 3;
 

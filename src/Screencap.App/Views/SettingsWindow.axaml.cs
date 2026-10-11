@@ -20,6 +20,8 @@ public partial class SettingsWindow : Window
         _app = app;
         if (app is null) return;
 
+        Sections.SelectionChanged += (_, _) => ShowSection(Sections.SelectedIndex);
+
         var settings = app.Settings;
         CopyAfterCapture.IsChecked = settings.CopyToClipboardAfterCapture;
         AutoSave.IsChecked = settings.AutoSaveEveryCapture;
@@ -33,6 +35,30 @@ public partial class SettingsWindow : Window
         JpegQuality.Value = settings.JpegQuality;
         UpdateJpegControls();
         LoadBackground(settings.CanvasBackground);
+        Autostart.IsEnabled = app.Autostart.IsSupported;
+        AutostartHint.IsVisible = !app.Autostart.IsSupported;
+        Autostart.IsChecked = app.Autostart.IsSupported && app.Autostart.IsEnabled;
+        Autostart.IsCheckedChanged += (_, _) =>
+        {
+            try
+            {
+                app.Autostart.SetEnabled(Autostart.IsChecked == true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                CrashLog.Write("Autostart", e);
+                Autostart.IsChecked = app.Autostart.IsEnabled;
+            }
+        };
+
+        ThemeMode.SelectedIndex = (int)settings.Theme;
+        ThemeMode.SelectionChanged += (_, _) =>
+        {
+            settings.Theme = (AppTheme)Math.Max(0, ThemeMode.SelectedIndex);
+            app.ApplyTheme();
+            app.SaveSettings();
+        };
+
         GlassIntensity.Value = settings.GlassIntensity;
         UpdateGlassText();
         GlassIntensity.ValueChanged += (_, _) =>
@@ -45,12 +71,14 @@ public partial class SettingsWindow : Window
         RegionHotkey.Click += (_, _) => StartRecording(RegionHotkey, h => settings.RegionHotkey = h);
         FullscreenHotkey.Click += (_, _) => StartRecording(FullscreenHotkey, h => settings.FullscreenHotkey = h);
         OcrHotkey.Click += (_, _) => StartRecording(OcrHotkey, h => settings.OcrHotkey = h);
+        ScrollHotkey.Click += (_, _) => StartRecording(ScrollHotkey, h => settings.ScrollHotkey = h);
         ResetHotkeys.Click += (_, _) =>
         {
             CancelRecording();
             settings.RegionHotkey = AppSettings.DefaultRegionHotkey();
             settings.FullscreenHotkey = AppSettings.DefaultFullscreenHotkey();
             settings.OcrHotkey = AppSettings.DefaultOcrHotkey();
+            settings.ScrollHotkey = AppSettings.DefaultScrollHotkey();
             app.ApplyHotkeySettings();
             ShowHotkeys();
         };
@@ -105,6 +133,15 @@ public partial class SettingsWindow : Window
         };
     }
 
+    /// <summary>Shows one settings section (0 = Allgemein … 3 = Tastenkürzel).</summary>
+    internal void ShowSection(int index)
+    {
+        CancelRecording();
+        Panel[] sections = [SectionGeneral, SectionSaving, SectionAppearance, SectionHotkeys];
+        for (var i = 0; i < sections.Length; i++) sections[i].IsVisible = i == Math.Max(0, index);
+        if (Sections.SelectedIndex != index) Sections.SelectedIndex = index;
+    }
+
     private Button? _recordingButton;
     private Action<Hotkey>? _recordingApply;
 
@@ -117,6 +154,7 @@ public partial class SettingsWindow : Window
         RegionHotkey.Content = _app.FormatHotkey(s.RegionHotkey);
         FullscreenHotkey.Content = _app.FormatHotkey(s.FullscreenHotkey);
         OcrHotkey.Content = _app.FormatHotkey(s.OcrHotkey);
+        ScrollHotkey.Content = _app.FormatHotkey(s.ScrollHotkey);
         HotkeyWarning.IsVisible = _app.FailedHotkeys.Count > 0;
         HotkeyWarning.Text = "Bereits von einer anderen App oder dem System belegt: " +
                              string.Join(", ", _app.FailedHotkeys.Select(_app.FormatHotkey));

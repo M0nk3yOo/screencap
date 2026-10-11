@@ -18,6 +18,8 @@ namespace Screencap.Core.Annotations;
 [JsonDerivedType(typeof(PixelateAnnotation), "pixelate")]
 [JsonDerivedType(typeof(SpotlightAnnotation), "spotlight")]
 [JsonDerivedType(typeof(ImageAnnotation), "image")]
+[JsonDerivedType(typeof(FreehandAnnotation), "freehand")]
+[JsonDerivedType(typeof(MagnifierAnnotation), "magnifier")]
 public abstract class Annotation
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -51,21 +53,95 @@ public abstract class BoxAnnotation : Annotation
     public override void Move(double dx, double dy) => Rect = Rect.Offset(dx, dy);
 }
 
+public enum ArrowStyle
+{
+    /// <summary>Line with a filled triangular head.</summary>
+    Standard,
+
+    /// <summary>Line with an open "V" head.</summary>
+    Open,
+
+    /// <summary>Filled heads at both ends.</summary>
+    Double,
+
+    /// <summary>Tapered wedge: thin tail growing into the head.</summary>
+    Wedge,
+
+    /// <summary>Bent through <see cref="ArrowAnnotation.Control"/>.</summary>
+    Curved,
+
+    /// <summary>Plain line without head.</summary>
+    Line,
+}
+
 public sealed class ArrowAnnotation : Annotation
 {
     public PointD Start { get; set; }
     public PointD End { get; set; }
 
-    public override RectD Bounds => RectD.FromPoints(Start, End);
+    public ArrowStyle Style { get; set; }
+
+    /// <summary>Control point of the quadratic curve (curved style).</summary>
+    public PointD? Control { get; set; }
+
+    [JsonIgnore]
+    public bool IsCurved => Style == ArrowStyle.Curved && Control is not null;
+
+    public override RectD Bounds
+    {
+        get
+        {
+            var b = RectD.FromPoints(Start, End);
+            if (!IsCurved) return b;
+            // The curve stays inside the triangle start–control–end.
+            var c = Control!.Value;
+            var x = Math.Min(b.X, c.X);
+            var y = Math.Min(b.Y, c.Y);
+            return new RectD(x, y, Math.Max(b.Right, c.X) - x, Math.Max(b.Bottom, c.Y) - y);
+        }
+    }
+
+    /// <summary>Point on the curve at t (0..1); a straight line unless curved.</summary>
+    public PointD PointAt(double t)
+    {
+        if (!IsCurved) return new PointD(Start.X + (End.X - Start.X) * t, Start.Y + (End.Y - Start.Y) * t);
+        var c = Control!.Value;
+        var u = 1 - t;
+        return new PointD(u * u * Start.X + 2 * u * t * c.X + t * t * End.X, u * u * Start.Y + 2 * u * t * c.Y + t * t * End.Y);
+    }
+
+    /// <summary>Bends the curve so it passes through <paramref name="midpoint"/> at t = 0.5.</summary>
+    public void BendThrough(PointD midpoint) =>
+        Control = new PointD(2 * midpoint.X - (Start.X + End.X) / 2, 2 * midpoint.Y - (Start.Y + End.Y) / 2);
+
+    /// <summary>A pleasant default bend: sideways by a quarter of the length.</summary>
+    public void ApplyDefaultBend()
+    {
+        var dx = End.X - Start.X;
+        var dy = End.Y - Start.Y;
+        var mid = new PointD((Start.X + End.X) / 2 - dy * 0.25, (Start.Y + End.Y) / 2 + dx * 0.25);
+        BendThrough(mid);
+    }
 
     public override void Move(double dx, double dy)
     {
         Start = new PointD(Start.X + dx, Start.Y + dy);
         End = new PointD(End.X + dx, End.Y + dy);
+        if (Control is { } c) Control = new PointD(c.X + dx, c.Y + dy);
     }
 
-    public override bool HitTest(PointD p, double tolerance) =>
-        DistanceToSegment(p, Start, End) <= tolerance + StrokeWidth;
+    public override bool HitTest(PointD p, double tolerance)
+    {
+        if (!IsCurved) return DistanceToSegment(p, Start, End) <= tolerance + StrokeWidth;
+        var previous = Start;
+        for (var i = 1; i <= 24; i++)
+        {
+            var next = PointAt(i / 24.0);
+            if (DistanceToSegment(p, previous, next) <= tolerance + StrokeWidth) return true;
+            previous = next;
+        }
+        return false;
+    }
 
     internal static double DistanceToSegment(PointD p, PointD a, PointD b)
     {
@@ -227,4 +303,125 @@ public sealed class ImageAnnotation : BoxAnnotation
     public PixelBuffer Image { get; set; } = null!;
 
     public override bool HitTest(PointD p, double tolerance) => Rect.Inflate(tolerance).Contains(p);
+}
+
+public enum PenType
+{
+    /// <summary>Opaque round line — notes, signatures, circling things.</summary>
+    Pen,
+
+    /// <summary>Wide translucent stroke; overlaps within one stroke don't get darker.</summary>
+    Highlighter,
+
+    /// <summary>Colored line with a contrasting rim, visible on any background.</summary>
+    Outline,
+}
+
+/// <summary>A freehand stroke. The point list is never changed in place, so clones may share it.</summary>
+public sealed class FreehandAnnotation : Annotation
+{
+    public IReadOnlyList<PointD> Points { get; set; } = [];
+
+    public PenType Pen { get; set; }
+
+    public override RectD Bounds
+    {
+        get
+        {
+            if (Points.Count == 0) return default;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var p in Points)
+            {
+                minX = Math.Min(minX, p.X);
+                minY = Math.Min(minY, p.Y);
+                maxX = Math.Max(maxX, p.X);
+                maxY = Math.Max(maxY, p.Y);
+            }
+            return new RectD(minX, minY, maxX - minX, maxY - minY).Inflate(StrokeWidth / 2);
+        }
+    }
+
+    public override void Move(double dx, double dy) =>
+        Points = Points.Select(p => new PointD(p.X + dx, p.Y + dy)).ToList();
+
+    public override bool HitTest(PointD p, double tolerance)
+    {
+        var reach = tolerance + StrokeWidth / 2;
+        if (Points.Count == 1)
+            return Math.Abs(p.X - Points[0].X) <= reach && Math.Abs(p.Y - Points[0].Y) <= reach;
+        for (var i = 1; i < Points.Count; i++)
+            if (ArrowAnnotation.DistanceToSegment(p, Points[i - 1], Points[i]) <= reach) return true;
+        return false;
+    }
+}
+
+/// <summary>
+/// Magnified detail: an oval marks the spot (<see cref="Source"/>), and a round lens next to it
+/// (<see cref="Lens"/>) shows it enlarged, connected by two lines. Both parts move independently.
+/// </summary>
+public sealed class MagnifierAnnotation : Annotation
+{
+    public RectD Source { get; set; }
+    public RectD Lens { get; set; }
+
+    [JsonIgnore]
+    public double Zoom => Source.Width > 0 ? Lens.Width / Source.Width : 2;
+
+    public override RectD Bounds
+    {
+        get
+        {
+            var a = Source.Inflate(StrokeWidth);
+            var b = Lens.Inflate(StrokeWidth);
+            var x = Math.Min(a.X, b.X);
+            var y = Math.Min(a.Y, b.Y);
+            return new RectD(x, y, Math.Max(a.Right, b.Right) - x, Math.Max(a.Bottom, b.Bottom) - y);
+        }
+    }
+
+    public override void Move(double dx, double dy)
+    {
+        MoveSource(dx, dy);
+        MoveLens(dx, dy);
+    }
+
+    public void MoveSource(double dx, double dy) => Source = Source.Offset(dx, dy);
+
+    public void MoveLens(double dx, double dy) => Lens = Lens.Offset(dx, dy);
+
+    /// <summary>Resizes the lens around its center so it shows the source at <paramref name="zoom"/>.</summary>
+    public void SetZoom(double zoom)
+    {
+        var cx = Lens.X + Lens.Width / 2;
+        var cy = Lens.Y + Lens.Height / 2;
+        var w = Source.Width * zoom;
+        var h = Source.Height * zoom;
+        Lens = new RectD(cx - w / 2, cy - h / 2, w, h);
+    }
+
+    /// <summary>Puts the lens beside the source (right, or left if there is no room).</summary>
+    public void PlaceLens(double zoom, double imageWidth)
+    {
+        var w = Source.Width * zoom;
+        var h = Source.Height * zoom;
+        var gap = Math.Max(Source.Width, Source.Height) * 0.6;
+        var x = Source.Right + gap;
+        if (x + w > imageWidth && Source.X - gap - w >= 0) x = Source.X - gap - w;
+        var y = Source.Y + Source.Height / 2 - h / 2 - h * 0.25;
+        Lens = new RectD(x, y, w, h);
+    }
+
+    public bool HitLens(PointD p, double tolerance) => InEllipse(Lens.Inflate(tolerance), p);
+
+    public bool HitSource(PointD p, double tolerance) => InEllipse(Source.Inflate(tolerance + StrokeWidth), p);
+
+    public override bool HitTest(PointD p, double tolerance) => HitLens(p, tolerance) || HitSource(p, tolerance);
+
+    private static bool InEllipse(RectD r, PointD p)
+    {
+        if (r.Width <= 0 || r.Height <= 0) return false;
+        var nx = (p.X - (r.X + r.Width / 2)) / (r.Width / 2);
+        var ny = (p.Y - (r.Y + r.Height / 2)) / (r.Height / 2);
+        return nx * nx + ny * ny <= 1;
+    }
 }

@@ -33,6 +33,10 @@ public sealed class MacWindowPlatform : IWindowPlatform
         ObjC.SendVoidRectBool(nsWindow, ObjC.sel_registerName("setFrame:display:"), frame, true);
     }
 
+    // NSWindowSharingNone: the window is left out of screenshots and screen recordings.
+    public void ExcludeFromCapture(NativeWindowHandle window) =>
+        ObjC.SendVoidULong(ToNSWindow(window), ObjC.sel_registerName("setSharingType:"), 0);
+
     public void ConfigurePinned(NativeWindowHandle window)
     {
         var nsWindow = ToNSWindow(window);

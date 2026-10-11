@@ -2,93 +2,158 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Screencap.App.Views.SettingsWindow"
         Title="Screencap – Einstellungen"
-        Width="540" SizeToContent="Height"
-        CanResize="False"
+        Width="760" Height="520"
+        MinWidth="640" MinHeight="420"
         WindowStartupLocation="CenterScreen">
-  <StackPanel Margin="22" Spacing="20">
-    <StackPanel Spacing="8">
-      <TextBlock Text="Nach der Aufnahme" FontWeight="SemiBold" FontSize="15" />
-      <CheckBox x:Name="CopyAfterCapture" Content="Automatisch in die Zwischenablage kopieren" />
-      <CheckBox x:Name="AutoSave" Content="Jeden Screenshot automatisch im Speicherort sichern" />
-      <CheckBox x:Name="RestoreTabs" Content="Reiter beim nächsten Start wiederherstellen" />
-      <TextBlock Text="Offene Screenshots samt Markierungen werden gespeichert und beim Start wieder geöffnet."
-                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0" />
-    </StackPanel>
+  <Grid ColumnDefinitions="190,*">
+    <!-- Section navigation -->
+    <Border Background="{DynamicResource ScChromeBrush}" BorderBrush="{DynamicResource ScDividerBrush}" BorderThickness="0,0,1,0">
+      <ListBox x:Name="Sections" Background="Transparent" Margin="8,12" SelectedIndex="0">
+        <ListBoxItem>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <PathIcon Data="{StaticResource IconSettings}" Width="15" Height="15" />
+            <TextBlock Text="Allgemein" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <PathIcon Data="{StaticResource IconSave}" Width="15" Height="15" />
+            <TextBlock Text="Speichern" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <PathIcon Data="{StaticResource IconLayers}" Width="15" Height="15" />
+            <TextBlock Text="Darstellung" />
+          </StackPanel>
+        </ListBoxItem>
+        <ListBoxItem>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <PathIcon Data="{StaticResource IconText}" Width="15" Height="15" />
+            <TextBlock Text="Tastenkürzel" />
+          </StackPanel>
+        </ListBoxItem>
+      </ListBox>
+    </Border>
 
-    <StackPanel Spacing="8">
-      <TextBlock Text="Speicherort" FontWeight="SemiBold" FontSize="15" />
-      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-        <TextBox x:Name="SaveFolder" IsReadOnly="True" PlaceholderText="Noch nicht festgelegt – wird beim ersten Speichern abgefragt" />
-        <Button x:Name="ChooseFolder" Grid.Column="1" Content="Ändern …" />
-        <Button x:Name="OpenFolder" Grid.Column="2" Content="Öffnen" />
-      </Grid>
-      <TextBlock Text="Dateinamen: „Screencap JJJJ-MM-TT HH-MM-SS.png“ bzw. „.jpg“"
-                 Opacity="0.6" FontSize="12" />
-      <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
-        <TextBlock Text="Format" VerticalAlignment="Center" Width="80" />
-        <RadioButton x:Name="FormatPng" GroupName="Format" Content="PNG (verlustfrei)" />
-        <RadioButton x:Name="FormatJpeg" GroupName="Format" Content="JPG (kleiner)" />
-      </StackPanel>
-      <StackPanel x:Name="JpegQualityRow" Orientation="Horizontal" Spacing="10">
-        <TextBlock Text="JPG-Qualität" VerticalAlignment="Center" Width="80" />
-        <Slider x:Name="JpegQuality" Minimum="40" Maximum="100" Width="200" SmallChange="5" LargeChange="10" />
-        <TextBlock x:Name="JpegQualityText" VerticalAlignment="Center" Width="40" />
-      </StackPanel>
-    </StackPanel>
+    <ScrollViewer Grid.Column="1">
+      <Panel Margin="26,20,26,24">
 
-    <StackPanel Spacing="8">
-      <TextBlock Text="Hintergrund" FontWeight="SemiBold" FontSize="15" />
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <ComboBox x:Name="BackgroundMode" Width="200">
-          <ComboBoxItem Content="Transparent" />
-          <ComboBoxItem Content="Weiß" />
-          <ComboBoxItem Content="Schwarz" />
-          <ComboBoxItem Content="Eigene Farbe" />
-        </ComboBox>
-        <ColorPicker x:Name="BackgroundColor" IsAlphaEnabled="False" VerticalAlignment="Center" />
-      </StackPanel>
-      <TextBlock Text="Für Flächen, die beim Verschieben eingefügter Bilder neben dem Screenshot entstehen. Transparent bleibt in PNG erhalten; JPG bekommt Weiß."
-                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-    </StackPanel>
+        <!-- Allgemein -->
+        <StackPanel x:Name="SectionGeneral" Spacing="22">
+          <TextBlock Text="Allgemein" FontSize="20" FontWeight="SemiBold" />
+          <StackPanel Spacing="8">
+            <TextBlock Text="Start" FontWeight="SemiBold" FontSize="15" />
+            <CheckBox x:Name="Autostart" Content="Beim Anmelden automatisch starten" />
+            <TextBlock x:Name="AutostartHint" Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0" IsVisible="False"
+                       Text="Nur in der installierten App verfügbar (nicht beim Start aus der Entwicklungsumgebung)." />
+          </StackPanel>
+          <StackPanel Spacing="8">
+            <TextBlock Text="Nach der Aufnahme" FontWeight="SemiBold" FontSize="15" />
+            <CheckBox x:Name="CopyAfterCapture" Content="Automatisch in die Zwischenablage kopieren" />
+            <CheckBox x:Name="AutoSave" Content="Jeden Screenshot automatisch im Speicherort sichern" />
+          </StackPanel>
+          <StackPanel Spacing="8">
+            <TextBlock Text="Editor" FontWeight="SemiBold" FontSize="15" />
+            <CheckBox x:Name="RestoreTabs" Content="Reiter beim nächsten Start wiederherstellen" />
+            <TextBlock Text="Offene Screenshots samt Markierungen werden gespeichert und beim Start wieder geöffnet."
+                       Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0" />
+          </StackPanel>
+        </StackPanel>
 
-    <StackPanel Spacing="8">
-      <TextBlock Text="Aufräumen" FontWeight="SemiBold" FontSize="15" />
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <CheckBox x:Name="DeleteOld" Content="Screenshots löschen nach" VerticalAlignment="Center" />
-        <NumericUpDown x:Name="DeleteDays" Minimum="1" Maximum="3650" Increment="1" FormatString="0" Width="130" />
-        <TextBlock Text="Tagen" VerticalAlignment="Center" />
-      </StackPanel>
-      <TextBlock Text="Betrifft nur Dateien im Speicherort, die Screencap selbst angelegt hat. Andere Dateien bleiben unberührt."
-                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-    </StackPanel>
+        <!-- Speichern -->
+        <StackPanel x:Name="SectionSaving" Spacing="22" IsVisible="False">
+          <TextBlock Text="Speichern" FontSize="20" FontWeight="SemiBold" />
+          <StackPanel Spacing="8">
+            <TextBlock Text="Speicherort" FontWeight="SemiBold" FontSize="15" />
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+              <TextBox x:Name="SaveFolder" IsReadOnly="True" PlaceholderText="Noch nicht festgelegt – wird beim ersten Speichern abgefragt" />
+              <Button x:Name="ChooseFolder" Grid.Column="1" Content="Ändern …" />
+              <Button x:Name="OpenFolder" Grid.Column="2" Content="Öffnen" />
+            </Grid>
+            <TextBlock Text="Dateinamen: „Screencap JJJJ-MM-TT HH-MM-SS.png“ bzw. „.jpg“" Opacity="0.6" FontSize="12" />
+          </StackPanel>
+          <StackPanel Spacing="8">
+            <TextBlock Text="Format" FontWeight="SemiBold" FontSize="15" />
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <RadioButton x:Name="FormatPng" GroupName="Format" Content="PNG (verlustfrei)" />
+              <RadioButton x:Name="FormatJpeg" GroupName="Format" Content="JPG (kleiner)" />
+            </StackPanel>
+            <StackPanel x:Name="JpegQualityRow" Orientation="Horizontal" Spacing="10">
+              <TextBlock Text="JPG-Qualität" VerticalAlignment="Center" Width="90" />
+              <Slider x:Name="JpegQuality" Minimum="40" Maximum="100" Width="200" SmallChange="5" LargeChange="10" />
+              <TextBlock x:Name="JpegQualityText" VerticalAlignment="Center" Width="40" />
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Spacing="8">
+            <TextBlock Text="Aufräumen" FontWeight="SemiBold" FontSize="15" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <CheckBox x:Name="DeleteOld" Content="Screenshots löschen nach" VerticalAlignment="Center" />
+              <NumericUpDown x:Name="DeleteDays" Minimum="1" Maximum="3650" Increment="1" FormatString="0" Width="130" />
+              <TextBlock Text="Tagen" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="Betrifft nur Dateien im Speicherort, die Screencap selbst angelegt hat. Andere Dateien bleiben unberührt."
+                       Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
 
-    <StackPanel Spacing="8">
-      <TextBlock Text="Darstellung" FontWeight="SemiBold" FontSize="15" />
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <TextBlock Text="Glas-Effekt" VerticalAlignment="Center" Width="80" />
-        <Slider x:Name="GlassIntensity" Minimum="0" Maximum="100" Width="200" SmallChange="5" LargeChange="10" />
-        <TextBlock x:Name="GlassIntensityText" VerticalAlignment="Center" Width="60" />
-      </StackPanel>
-      <TextBlock Text="Durchscheinendes Editorfenster (macOS: Vibrancy, Windows: Mica/Acrylic). 0 = aus."
-                 Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-    </StackPanel>
+        <!-- Darstellung -->
+        <StackPanel x:Name="SectionAppearance" Spacing="22" IsVisible="False">
+          <TextBlock Text="Darstellung" FontSize="20" FontWeight="SemiBold" />
+          <StackPanel Spacing="8">
+            <TextBlock Text="Design" FontWeight="SemiBold" FontSize="15" />
+            <ComboBox x:Name="ThemeMode" Width="240">
+              <ComboBoxItem Content="Automatisch (wie System)" />
+              <ComboBoxItem Content="Hell" />
+              <ComboBoxItem Content="Dunkel" />
+            </ComboBox>
+          </StackPanel>
+          <StackPanel Spacing="8">
+            <TextBlock Text="Glas-Effekt" FontWeight="SemiBold" FontSize="15" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Slider x:Name="GlassIntensity" Minimum="0" Maximum="100" Width="240" SmallChange="5" LargeChange="10" />
+              <TextBlock x:Name="GlassIntensityText" VerticalAlignment="Center" Width="60" />
+            </StackPanel>
+            <TextBlock Text="Durchscheinendes Editorfenster (macOS: Vibrancy, Windows: Mica/Acrylic). 0 = aus."
+                       Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Spacing="8">
+            <TextBlock Text="Hintergrund" FontWeight="SemiBold" FontSize="15" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ComboBox x:Name="BackgroundMode" Width="240">
+                <ComboBoxItem Content="Transparent" />
+                <ComboBoxItem Content="Weiß" />
+                <ComboBoxItem Content="Schwarz" />
+                <ComboBoxItem Content="Eigene Farbe" />
+              </ComboBox>
+              <ColorPicker x:Name="BackgroundColor" IsAlphaEnabled="False" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="Für Flächen, die beim Herausziehen von Elementen neben dem Screenshot entstehen. Transparent bleibt in PNG erhalten; JPG bekommt Weiß."
+                       Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
 
-    <StackPanel Spacing="8">
-      <TextBlock Text="Tastenkürzel" FontWeight="SemiBold" FontSize="15" />
-      <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
-        <TextBlock Text="Bereich aufnehmen" VerticalAlignment="Center" />
-        <Button x:Name="RegionHotkey" Grid.Column="1" MinWidth="180" />
-        <TextBlock Grid.Row="1" Text="Vollbild aufnehmen" VerticalAlignment="Center" />
-        <Button x:Name="FullscreenHotkey" Grid.Row="1" Grid.Column="1" MinWidth="180" />
-        <TextBlock Grid.Row="2" Text="Text erkennen" VerticalAlignment="Center" />
-        <Button x:Name="OcrHotkey" Grid.Row="2" Grid.Column="1" MinWidth="180" />
-      </Grid>
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button x:Name="ResetHotkeys" Content="Standard wiederherstellen" />
-        <TextBlock Text="Klicken und neue Tastenkombination drücken (Esc bricht ab)."
-                   Opacity="0.6" FontSize="12" VerticalAlignment="Center" />
-      </StackPanel>
-      <TextBlock x:Name="HotkeyWarning" Foreground="#E5484D" TextWrapping="Wrap" FontSize="12" IsVisible="False" />
-    </StackPanel>
-  </StackPanel>
+        <!-- Tastenkürzel -->
+        <StackPanel x:Name="SectionHotkeys" Spacing="22" IsVisible="False">
+          <TextBlock Text="Tastenkürzel" FontSize="20" FontWeight="SemiBold" />
+          <StackPanel Spacing="10">
+            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+              <TextBlock Text="Bereich aufnehmen" VerticalAlignment="Center" />
+              <Button x:Name="RegionHotkey" Grid.Column="1" MinWidth="200" />
+              <TextBlock Grid.Row="1" Text="Vollbild aufnehmen" VerticalAlignment="Center" />
+              <Button x:Name="FullscreenHotkey" Grid.Row="1" Grid.Column="1" MinWidth="200" />
+              <TextBlock Grid.Row="2" Text="Text erkennen" VerticalAlignment="Center" />
+              <Button x:Name="OcrHotkey" Grid.Row="2" Grid.Column="1" MinWidth="200" />
+              <TextBlock Grid.Row="3" Text="Scroll-Aufnahme" VerticalAlignment="Center" />
+              <Button x:Name="ScrollHotkey" Grid.Row="3" Grid.Column="1" MinWidth="200" />
+            </Grid>
+            <TextBlock Text="Klicken und die neue Tastenkombination drücken (Esc bricht ab)." Opacity="0.6" FontSize="12" />
+            <Button x:Name="ResetHotkeys" Content="Standard wiederherstellen" />
+            <TextBlock x:Name="HotkeyWarning" Foreground="#E5484D" TextWrapping="Wrap" FontSize="12" IsVisible="False" />
+          </StackPanel>
+        </StackPanel>
+
+      </Panel>
+    </ScrollViewer>
+  </Grid>
 </Window>

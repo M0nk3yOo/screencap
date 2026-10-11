@@ -84,8 +84,10 @@ internal sealed class AppController
             }
         }
 
+        ApplyTheme();
         _trayIcon = TrayMenu.Create(this);
         RegisterHotkeys();
+        ApplyAutostartDefault();
 
         CleanUpOldScreenshots();
         _cleanupTimer = new DispatcherTimer(TimeSpan.FromHours(6), DispatcherPriority.Background, (_, _) => CleanUpOldScreenshots());
@@ -146,6 +148,8 @@ internal sealed class AppController
             failed.Add(Settings.FullscreenHotkey);
         if (!_platform.Hotkeys.TryRegister(Settings.OcrHotkey, () => Dispatcher.UIThread.Post(() => _ = CaptureTextAsync())))
             failed.Add(Settings.OcrHotkey);
+        if (!_platform.Hotkeys.TryRegister(Settings.ScrollHotkey, () => Dispatcher.UIThread.Post(() => _ = CaptureScrollingAsync())))
+            failed.Add(Settings.ScrollHotkey);
         FailedHotkeys = failed;
         if (failed.Count > 0)
             Console.Error.WriteLine($"Hotkeys already in use: {string.Join(", ", failed.Select(h => h.ToDisplayString(IsMac)))}");
@@ -182,6 +186,69 @@ internal sealed class AppController
             return;
         }
         new TextResultWindow(this, selection.Capture, text, codes, selection.Region, selection.Screen).Show();
+    }
+
+    public IAutostart Autostart => _platform.Autostart;
+
+    /// <summary>On the very first launch, Screencap registers itself to start at login.</summary>
+    private void ApplyAutostartDefault()
+    {
+        if (!_platform.Autostart.IsSupported) return;
+        try
+        {
+            // Re-register an existing entry so it points to this copy (the app may have been moved).
+            if (_platform.Autostart.IsEnabled) _platform.Autostart.SetEnabled(true);
+            if (Settings.AutostartConfigured) return;
+            _platform.Autostart.SetEnabled(true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            CrashLog.Write("Autostart", e);
+        }
+        Settings.AutostartConfigured = true;
+        SaveSettings();
+    }
+
+    /// <summary>Light, dark or following the system.</summary>
+    public void ApplyTheme()
+    {
+        if (Application.Current is not { } app) return;
+        app.RequestedThemeVariant = Settings.Theme switch
+        {
+            AppTheme.Light => Avalonia.Styling.ThemeVariant.Light,
+            AppTheme.Dark => Avalonia.Styling.ThemeVariant.Dark,
+            _ => Avalonia.Styling.ThemeVariant.Default,
+        };
+    }
+
+    /// <summary>
+    /// Scroll capture: select a region, then the user scrolls while frames are captured and
+    /// stitched. The result opens in the editor.
+    /// </summary>
+    public async Task CaptureScrollingAsync()
+    {
+        if (await SelectRegionAsync() is not { } selection) return;
+        PixelBuffer? stitched;
+        try
+        {
+            stitched = await new ScrollCaptureWindow(_platform, selection.Region, selection.Screen).RunAsync();
+        }
+        catch (Exception e)
+        {
+            await MessageDialog.ShowErrorAsync("Scroll-Aufnahme fehlgeschlagen", e);
+            return;
+        }
+        if (stitched is null) return;
+
+        var capture = new Capture(stitched, selection.Capture.Scaling)
+        {
+            SourceApp = selection.Capture.SourceApp,
+            SourceTitle = selection.Capture.SourceTitle,
+        };
+        LastCapture = capture;
+        var window = ShowMainWindow();
+        OpenInEditor(capture);
+        await AfterCaptureAsync(capture, window);
     }
 
     /// <summary>Stops the global hotkeys, e.g. while the user records a new one.</summary>
@@ -223,13 +290,14 @@ internal sealed class AppController
             _preview?.Close();
 
             var screens = _screenProbe.Screens.All.ToList();
+            var windows = ListWindows();
             var shots = await Task.WhenAll(screens.Select(s => _platform.Capturer.CaptureAsync(ToScreenInfo(s))));
 
             var selection = new TaskCompletionSource<(int Index, Rect Rect)?>();
             for (var i = 0; i < screens.Count; i++)
             {
                 var index = i;
-                var overlay = new SelectionOverlayWindow(screens[i], shots[i], shots[i].ToBitmap(), _platform.Windows);
+                var overlay = new SelectionOverlayWindow(screens[i], shots[i], shots[i].ToBitmap(), _platform.Windows, windows);
                 overlay.Selector.Completed += rect => selection.TrySetResult(rect is { } r ? (index, r) : null);
                 overlay.Closed += (_, _) => selection.TrySetResult(null);
                 overlays.Add(overlay);
@@ -253,7 +321,9 @@ internal sealed class AppController
                 screen.Bounds.Y + (int)Math.Round(rect.Y * screen.Scaling),
                 (int)Math.Round(rect.Width * screen.Scaling),
                 (int)Math.Round(rect.Height * screen.Scaling));
-            return new RegionSelection(new Capture(pixels.Crop(crop), imageScale), region, screen);
+            var capture = new Capture(pixels.Crop(crop), imageScale);
+            AttachSource(capture, windows, region);
+            return new RegionSelection(capture, region, screen);
         }
         catch (Exception e)
         {
@@ -339,9 +409,12 @@ internal sealed class AppController
             var screens = _screenProbe.Screens;
             var screen = screens.ScreenFromPoint(new PixelPoint((int)cursor.X, (int)cursor.Y))
                          ?? screens.Primary ?? screens.All[0];
+            var windows = ListWindows();
             var pixels = await _platform.Capturer.CaptureAsync(ToScreenInfo(screen));
             var imageScale = pixels.Width / (screen.Bounds.Width / screen.Scaling);
-            await OnCapturedAsync(new Capture(pixels, imageScale), screen.Bounds, screen);
+            var capture = new Capture(pixels, imageScale);
+            AttachSource(capture, windows, screen.Bounds);
+            await OnCapturedAsync(capture, screen.Bounds, screen);
         }
         catch (Exception e)
         {
@@ -353,8 +426,12 @@ internal sealed class AppController
         }
     }
 
+    /// <summary>The most recent capture shown in the preview (for tests and diagnostics).</summary>
+    internal Capture? LastCapture { get; private set; }
+
     private async Task OnCapturedAsync(Capture capture, PixelRect region, Screen screen)
     {
+        LastCapture = capture;
         var preview = new PreviewWindow(this, capture, region, screen);
         _preview = preview;
         preview.Closed += (_, _) =>
@@ -375,6 +452,28 @@ internal sealed class AppController
             "Systemeinstellungen öffnen", "Abbrechen");
         if (choice == 0) _platform.Capturer.RequestPermission();
         return false;
+    }
+
+    /// <summary>Open windows at capture time (frontmost first); best effort, never blocks a capture.</summary>
+    private IReadOnlyList<WindowInfo> ListWindows()
+    {
+        try
+        {
+            return _platform.WindowInspector.GetWindows();
+        }
+        catch (Exception e)
+        {
+            CrashLog.Write("Window list", e);
+            return [];
+        }
+    }
+
+    /// <summary>Remembers which app/window the screenshot most likely shows (for file metadata).</summary>
+    private static void AttachSource(Capture capture, IReadOnlyList<WindowInfo> windows, PixelRect region)
+    {
+        if (WindowMatcher.Find(windows, new IntRect(region.X, region.Y, region.Width, region.Height)) is not { } window) return;
+        capture.SourceApp = window.App;
+        capture.SourceTitle = window.Title == window.App ? null : window.Title;
     }
 
     private static ScreenInfo ToScreenInfo(Screen s) =>
@@ -405,8 +504,12 @@ internal sealed class AppController
     public byte[] Encode(Capture capture, ImageFormat format)
     {
         using var image = Flatten(capture);
-        var pixels = image.ToPixelBuffer();
-        return format == ImageFormat.Jpeg ? pixels.EncodeJpeg(Settings.JpegQuality, White) : pixels.EncodePng();
+        var png = image.ToPng();
+        // App, window title and time go into the file (PNG text/XMP, JPEG EXIF/XMP).
+        var metadata = new ImageMetadata(capture.SourceApp, capture.SourceTitle, capture.CreatedAt);
+        return format == ImageFormat.Jpeg
+            ? MetadataWriter.AddToJpeg(PixelBuffer.Decode(png).EncodeJpeg(Settings.JpegQuality, White), metadata)
+            : MetadataWriter.AddToPng(png, metadata);
     }
 
     /// <summary>

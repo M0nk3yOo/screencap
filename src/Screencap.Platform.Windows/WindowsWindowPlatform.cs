@@ -10,6 +10,9 @@ public sealed class WindowsWindowPlatform : IWindowPlatform
         Win32.SetWindowPos(window.Handle, Win32.HWND_TOPMOST, screenBounds.X, screenBounds.Y,
             screenBounds.Width, screenBounds.Height, Win32.SWP_NOACTIVATE);
 
+    // WDA_EXCLUDEFROMCAPTURE (Windows 10 2004+): BitBlt and other capture APIs skip the window.
+    public void ExcludeFromCapture(NativeWindowHandle window) => Win32.SetWindowDisplayAffinity(window.Handle, 0x11);
+
     // Showing a window on all virtual desktops has no public API (only the undocumented
     // IVirtualDesktopManagerInternal COM interface), so pins stay on their desktop for now.
     public void ConfigurePinned(NativeWindowHandle window) { }

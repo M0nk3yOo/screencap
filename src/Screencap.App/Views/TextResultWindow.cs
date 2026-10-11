@@ -46,7 +46,6 @@ internal sealed class TextResultWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         Background = Brushes.Transparent;
         TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
-        RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Opacity = 0;
 
         // A QR code in the region is what the user is after; its text comes first.
@@ -106,15 +105,17 @@ internal sealed class TextResultWindow : Window
         buttons.Children.Add(openLink);
         buttons.Children.Add(copy);
 
-        Content = new Border
+        var frame = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x23, 0x24, 0x27)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x33, 255, 255, 255)),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(12, 8, 12, 12),
             Child = new StackPanel { Spacing = 8, Children = { header, _text, buttons } },
         };
+        // Follows the light/dark design like the screenshot preview.
+        frame.Bind(Border.BackgroundProperty, frame.GetResourceObservable("ScHudBrush"));
+        frame.Bind(Border.BorderBrushProperty, frame.GetResourceObservable("ScHudBorderBrush"));
+        Content = frame;
 
         PointerPressed += (_, e) =>
         {

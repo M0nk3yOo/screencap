@@ -8,10 +8,10 @@ Screenshot-Tool nach dem Vorbild von [Shottr](https://shottr.cc) – für **macO
 
 ## Funktionen
 
-- **Aufnehmen**: Bereich (⌘⇧2 / Strg+Umschalt+2) mit eingefrorenem Bildschirm und Pixel-Lupe, Vollbild (⌘⇧1) – Kürzel frei einstellbar
+- **Aufnehmen**: Bereich (⌘⇧2 / Strg+Umschalt+2) mit eingefrorenem Bildschirm und Pixel-Lupe, Fenster per Klick, Vollbild (⌘⇧1), Scroll-Aufnahme (⌘⇧6) – Kürzel frei einstellbar
 - **Vorschaufenster** direkt neben dem Bereich: Bearbeiten, Kopieren, Speichern, Text erkennen, Anpinnen
 - **Pins**: Screenshots schweben immer im Vordergrund, in Originalgröße, mit Zoom und Deckkraft
-- **Editor mit Reitern**: Zuschneiden, Pfeil, Rechteck, Ellipse, Marker, Text mit Formatierung, Nummern mit Zeiger, Verpixeln/Verwischen (auch per Klick auf erkannte Wörter), Spotlight, Pipette, weitere Aufnahmen einfügen
+- **Editor mit Reitern**: Zuschneiden, Freihand (Stift, Marker, Konturstift), Lupe, Pfeil, Rechteck, Ellipse, Marker, Text mit Formatierung, Nummern mit Zeiger, Verpixeln/Verwischen (auch per Klick auf erkannte Wörter), Spotlight, Pipette, weitere Aufnahmen einfügen
 - **Alles bleibt editierbar**: Griffe, Ebenen-Panel, Rückgängig/Wiederholen, Zoom; die Arbeitsfläche wächst mit herausgezogenen Elementen
 - **Text- und QR-Erkennung** lokal (Apple Vision / Windows-OCR, ZXing) – global per ⌘⇧O oder im Editor
 - **Teilen**: Zwischenablage (funktioniert in Mail, Office, Chat …), PNG oder JPG, automatisches Speichern, Aufräumen alter Screenshots

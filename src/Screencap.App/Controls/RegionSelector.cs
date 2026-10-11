@@ -20,7 +20,9 @@ internal sealed class RegionSelector : Control
 
     private static readonly IBrush DimBrush = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0));
     private static readonly IPen SelectionPen = new Pen(Brushes.White, 1);
-    private static readonly IPen CrosshairPen = new Pen(new SolidColorBrush(Color.FromArgb(0xB0, 255, 255, 255)), 1);
+    // Guide lines: a dark line under a dashed white one stays visible on light and dark content.
+    private static readonly IPen GuideShadowPen = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0, 0, 0)), 1);
+    private static readonly IPen GuidePen = new Pen(new SolidColorBrush(Color.FromArgb(0xE0, 255, 255, 255)), 1, new DashStyle([5, 4], 0));
     private static readonly IPen GridPen = new Pen(new SolidColorBrush(Color.FromArgb(0x30, 0, 0, 0)), 1);
     private static readonly IPen LoupeBorderPen = new Pen(Brushes.White, 2);
     private static readonly Typeface LabelTypeface = new(FontFamily.Default, FontStyle.Normal, FontWeight.Medium);
@@ -28,10 +30,16 @@ internal sealed class RegionSelector : Control
     private readonly PixelBuffer _pixels;
     private Point? _pointer;
     private Point? _dragStart;
+    private readonly IReadOnlyList<(Rect Bounds, string Label)> _windows;
+    private Rect? _hoverWindow;
+    private string? _hoverLabel;
 
     /// <param name="imageScale">Image pixels per logical unit (2 on Retina).</param>
-    public RegionSelector(Bitmap image, PixelBuffer pixels, double imageScale)
+    /// <param name="windows">Windows on this screen, frontmost first, in this control's coordinates.</param>
+    public RegionSelector(Bitmap image, PixelBuffer pixels, double imageScale,
+        IReadOnlyList<(Rect Bounds, string Label)>? windows = null)
     {
+        _windows = windows ?? [];
         Image = image;
         _pixels = pixels;
         ImageScale = imageScale;
@@ -66,7 +74,22 @@ internal sealed class RegionSelector : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         _pointer = Clamp(e.GetPosition(this));
+        // Before dragging, the window under the pointer is highlighted; a click takes it.
+        if (_dragStart is null) UpdateHoverWindow(_pointer.Value);
         InvalidateVisual();
+    }
+
+    private void UpdateHoverWindow(Point p)
+    {
+        _hoverWindow = null;
+        _hoverLabel = null;
+        foreach (var (bounds, label) in _windows)
+        {
+            if (!bounds.Contains(p)) continue;
+            _hoverWindow = bounds.Intersect(new Rect(Bounds.Size));
+            _hoverLabel = label;
+            return;
+        }
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -75,8 +98,8 @@ internal sealed class RegionSelector : Control
         var selection = Selection;
         _dragStart = null;
         e.Pointer.Capture(null);
-        // Tiny drags are accidental clicks: take the whole screen instead.
-        Completed?.Invoke(selection is { Width: >= 4, Height: >= 4 } ? selection : new Rect(Bounds.Size));
+        // A click (tiny drag) takes the highlighted window, or the whole screen if there is none.
+        Completed?.Invoke(selection is { Width: >= 4, Height: >= 4 } ? selection : _hoverWindow ?? new Rect(Bounds.Size));
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -101,20 +124,54 @@ internal sealed class RegionSelector : Control
         if (Selection is { } selection)
         {
             DrawDim(context, bounds, selection);
+            // The selection's edges continue across the whole screen, so far-apart content
+            // can be lined up (e.g. starting left and checking the height reaches on the right).
+            DrawHorizontalGuide(context, bounds, selection.Top);
+            DrawHorizontalGuide(context, bounds, selection.Bottom);
+            DrawVerticalGuide(context, bounds, selection.Left);
+            DrawVerticalGuide(context, bounds, selection.Right);
             context.DrawRectangle(null, SelectionPen, selection.Deflate(0.5));
             DrawSizeLabel(context, selection);
+        }
+        else if (_hoverWindow is { } window)
+        {
+            DrawDim(context, bounds, window);
+            context.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x22, 0, 122, 255)),
+                new Pen(new SolidColorBrush(Color.FromArgb(0xE0, 0, 122, 255)), 3), window.Deflate(1.5));
+            DrawLabel(context, string.Create(CultureInfo.InvariantCulture,
+                $"{_hoverLabel}   {Math.Round(window.Width * ImageScale)} × {Math.Round(window.Height * ImageScale)}   · Klicken = Fenster"),
+                new Point(window.X + 8, window.Y + 8));
+            DrawCrosshair(context, bounds);
         }
         else
         {
             context.FillRectangle(DimBrush, bounds);
-            if (_pointer is { } p)
-            {
-                context.DrawLine(CrosshairPen, new Point(0, p.Y), new Point(bounds.Width, p.Y));
-                context.DrawLine(CrosshairPen, new Point(p.X, 0), new Point(p.X, bounds.Height));
-            }
+            DrawCrosshair(context, bounds);
         }
 
         if (_pointer is { } pointer) DrawLoupe(context, pointer, bounds);
+    }
+
+    /// <summary>Full-screen lines through the pointer before dragging starts.</summary>
+    private void DrawCrosshair(DrawingContext context, Rect bounds)
+    {
+        if (_pointer is not { } p) return;
+        DrawHorizontalGuide(context, bounds, p.Y);
+        DrawVerticalGuide(context, bounds, p.X);
+    }
+
+    private static void DrawHorizontalGuide(DrawingContext context, Rect bounds, double y)
+    {
+        y = Math.Round(y) + 0.5; // crisp 1-px line
+        context.DrawLine(GuideShadowPen, new Point(0, y + 1), new Point(bounds.Width, y + 1));
+        context.DrawLine(GuidePen, new Point(0, y), new Point(bounds.Width, y));
+    }
+
+    private static void DrawVerticalGuide(DrawingContext context, Rect bounds, double x)
+    {
+        x = Math.Round(x) + 0.5;
+        context.DrawLine(GuideShadowPen, new Point(x + 1, 0), new Point(x + 1, bounds.Height));
+        context.DrawLine(GuidePen, new Point(x, 0), new Point(x, bounds.Height));
     }
 
     private static void DrawDim(DrawingContext context, Rect bounds, Rect hole)

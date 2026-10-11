@@ -20,6 +20,12 @@ public sealed class ToolMemory
     public bool Strikethrough { get; set; }
     public TextStyle TextStyle { get; set; }
 
+    public PenType Pen { get; set; }
+
+    public double MagnifierZoom { get; set; } = 2;
+
+    public ArrowStyle ArrowStyle { get; set; }
+
     public ObscureStyle ObscureStyle { get; set; }
     public double ObscureStrength { get; set; } = 5;
 }

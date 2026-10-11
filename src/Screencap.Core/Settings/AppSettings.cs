@@ -6,6 +6,14 @@ public enum ImageFormat
     Jpeg,
 }
 
+public enum AppTheme
+{
+    /// <summary>Follows the system's light/dark setting.</summary>
+    System,
+    Light,
+    Dark,
+}
+
 public sealed class AppSettings
 {
     /// <summary>Reopen the editor tabs of the last session on startup.</summary>
@@ -47,6 +55,17 @@ public sealed class AppSettings
     /// <summary>Select a screen region and copy its text (OCR) without opening the editor.</summary>
     public Hotkey OcrHotkey { get; set; } = DefaultOcrHotkey();
 
+    /// <summary>Select a region and capture it while scrolling.</summary>
+    public Hotkey ScrollHotkey { get; set; } = DefaultScrollHotkey();
+
+    public AppTheme Theme { get; set; } = AppTheme.System;
+
+    /// <summary>
+    /// Set once the start-at-login default was applied on first launch. The setting itself
+    /// lives in the OS (login item / Run key), so the user can also change it there.
+    /// </summary>
+    public bool AutostartConfigured { get; set; }
+
     /// <summary>Translucency of the editor window (0 = opaque, 100 = strongest glass effect).</summary>
     public int GlassIntensity { get; set; } = 40;
 
@@ -62,6 +81,8 @@ public sealed class AppSettings
     public static Hotkey DefaultFullscreenHotkey() => new(PrimaryModifiers, HotkeyKey.D1);
 
     public static Hotkey DefaultOcrHotkey() => new(PrimaryModifiers, HotkeyKey.O);
+
+    public static Hotkey DefaultScrollHotkey() => new(PrimaryModifiers, HotkeyKey.D6);
 
     /// <summary>Suggested location when the user picks a folder for the first time.</summary>
     public static string SuggestedSaveFolder() =>

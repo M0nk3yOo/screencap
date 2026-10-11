@@ -43,7 +43,7 @@ public partial class PreviewWindow : Window
         ImageHost.MinWidth = MinThumbnailWidth;
 
         var command = AppController.IsMac ? "⌘" : "Strg+";
-        CopyButton.SetValue(ToolTip.TipProperty, $"Kopieren ({command}C)");
+        CopyButton.SetValue(ToolTip.TipProperty, $"Kopieren und schließen ({command}C)");
         SaveButton.SetValue(ToolTip.TipProperty, $"Speichern ({command}S)");
         OcrButton.SetValue(ToolTip.TipProperty, "Text erkennen und kopieren");
 
@@ -142,10 +142,19 @@ public partial class PreviewWindow : Window
         Close();
     }
 
+    /// <summary>Copying finishes the job, so the preview closes (like the pin).</summary>
     private async Task CopyAsync()
     {
-        await _app.CopyAsync(_capture, this);
-        ShowToast("Kopiert");
+        try
+        {
+            await _app.CopyAsync(_capture, this);
+            Close();
+        }
+        catch (Exception e)
+        {
+            CrashLog.Write("Copy (preview)", e);
+            ShowToast("Kopieren fehlgeschlagen");
+        }
     }
 
     private async Task RecognizeTextAsync()

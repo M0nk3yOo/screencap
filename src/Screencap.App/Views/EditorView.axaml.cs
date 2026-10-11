@@ -30,6 +30,7 @@ public partial class EditorView : UserControl
     [
         (EditorTool.Select, "IconSelect", "Auswählen und verschieben", Key.V, 0),
         (EditorTool.Crop, "IconCrop", "Zuschneiden", Key.C, 0),
+        (EditorTool.Freehand, "IconFreehand", "Freihand – Umschalt für gerade Linie", Key.F, 1),
         (EditorTool.Arrow, "IconArrow", "Pfeil", Key.A, 1),
         (EditorTool.Rectangle, "IconRectangle", "Rechteck", Key.R, 1),
         (EditorTool.Ellipse, "IconEllipse", "Ellipse", Key.O, 1),
@@ -38,6 +39,7 @@ public partial class EditorView : UserControl
         (EditorTool.Counter, "IconCounter", "Nummer – ziehen für einen Zeiger", Key.N, 1),
         (EditorTool.Pixelate, "IconPixelate", "Verpixeln / Verwischen", Key.B, 2),
         (EditorTool.Spotlight, "IconSpotlight", "Spotlight", Key.S, 2),
+        (EditorTool.Magnifier, "IconMagnifier", "Lupe – vom Mittelpunkt aus aufziehen", Key.L, 2),
         (EditorTool.TextRecognition, "IconOcr", "Text markieren – Bereich aufziehen, Text und QR-Codes werden erkannt", Key.E, 3),
         (EditorTool.ColorPicker, "IconPicker", "Pipette", Key.I, 2),
     ];
@@ -297,6 +299,8 @@ public partial class EditorView : UserControl
     {
         None,
         Line,
+        Freehand,
+        Magnifier,
         Text,
         Counter,
         Obscure,
@@ -312,6 +316,8 @@ public partial class EditorView : UserControl
                 TextAnnotation => EditorTool.Text,
                 CounterAnnotation => EditorTool.Counter,
                 PixelateAnnotation => EditorTool.Pixelate,
+                FreehandAnnotation => EditorTool.Freehand,
+                MagnifierAnnotation => EditorTool.Magnifier,
                 null => _canvas.Tool,
                 _ => EditorTool.Select,
             };
@@ -319,6 +325,8 @@ public partial class EditorView : UserControl
             return subject switch
             {
                 EditorTool.Arrow or EditorTool.Rectangle or EditorTool.Ellipse => OptionsContext.Line,
+                EditorTool.Freehand => OptionsContext.Freehand,
+                EditorTool.Magnifier => OptionsContext.Magnifier,
                 EditorTool.Text => OptionsContext.Text,
                 EditorTool.Counter => OptionsContext.Counter,
                 EditorTool.Pixelate => OptionsContext.Obscure,
@@ -345,6 +353,9 @@ public partial class EditorView : UserControl
                 case OptionsContext.Obscure:
                     _canvas.ObscureStrength = SizeSlider.Value;
                     break;
+                case OptionsContext.Magnifier:
+                    _canvas.MagnifierZoom = SizeSlider.Value;
+                    break;
                 case OptionsContext.Text when _textDraft is { } editing:
                     _canvas.StrokePoints = SizeSlider.Value;
                     editing.FontSize = ToolSizes.FontFor(SizeSlider.Value) * Capture.Scaling;
@@ -358,6 +369,11 @@ public partial class EditorView : UserControl
             UpdateSizeLabel();
             RememberOptions();
         };
+        foreach (var (button, style) in ArrowStyleButtons)
+            button.Click += (_, _) => SetArrowStyle(style);
+        PenButton.Click += (_, _) => SetPen(PenType.Pen);
+        HighlighterPenButton.Click += (_, _) => SetPen(PenType.Highlighter);
+        OutlinePenButton.Click += (_, _) => SetPen(PenType.Outline);
         PixelateStyleButton.Click += (_, _) => SetObscureStyle(ObscureStyle.Pixelate);
         BlurStyleButton.Click += (_, _) => SetObscureStyle(ObscureStyle.Blur);
 
@@ -398,6 +414,46 @@ public partial class EditorView : UserControl
         RememberOptions();
     }
 
+    private (Avalonia.Controls.Primitives.ToggleButton Button, ArrowStyle Style)[] ArrowStyleButtons =>
+    [
+        (ArrowStandardButton, ArrowStyle.Standard), (ArrowOpenButton, ArrowStyle.Open), (ArrowDoubleButton, ArrowStyle.Double),
+        (ArrowWedgeButton, ArrowStyle.Wedge), (ArrowCurvedButton, ArrowStyle.Curved), (ArrowLineButton, ArrowStyle.Line),
+    ];
+
+    /// <summary>Chooses the arrow look for new arrows and the selected one.</summary>
+    private void SetArrowStyle(ArrowStyle style)
+    {
+        _canvas.ArrowStyle = style;
+        Memory.ArrowStyle = style;
+        _canvas.EditSelected<ArrowAnnotation>(a =>
+        {
+            a.Style = style;
+            if (style == ArrowStyle.Curved && a.Control is null) a.ApplyDefaultBend();
+        });
+        UpdateOptions();
+        RememberOptions();
+    }
+
+    /// <summary>Switches the pen; each pen keeps its own width. A selected stroke changes too.</summary>
+    private void SetPen(PenType pen)
+    {
+        _canvas.PenType = pen;
+        Memory.Pen = pen;
+        // The stroke takes on the new pen's look, including its remembered width.
+        _canvas.StrokePoints = RememberedPenWidth(pen);
+        var width = _canvas.StrokePoints * Capture.Scaling;
+        _canvas.EditSelected<FreehandAnnotation>(s =>
+        {
+            s.Pen = pen;
+            s.StrokeWidth = width;
+        });
+        UpdateOptions();
+        RememberOptions();
+    }
+
+    private double RememberedPenWidth(PenType pen) =>
+        Memory.StrokeByTool.TryGetValue($"Freehand.{pen}", out var width) ? width : ToolSizes.DefaultFor(pen);
+
     private void SetObscureStyle(ObscureStyle style)
     {
         _canvas.ObscureStyle = style;
@@ -429,6 +485,14 @@ public partial class EditorView : UserControl
             SizeSlider.Value = _canvas.ObscureStrength;
             ToolTip.SetTip(SizeSlider, "Stärke – je höher, desto unleserlicher");
         }
+        else if (context == OptionsContext.Magnifier)
+        {
+            if (_canvas.Selected is MagnifierAnnotation lens) _canvas.MagnifierZoom = lens.Zoom;
+            SizeSlider.Minimum = ToolSizes.MinZoom;
+            SizeSlider.Maximum = ToolSizes.MaxZoom;
+            SizeSlider.Value = _canvas.MagnifierZoom;
+            ToolTip.SetTip(SizeSlider, "Vergrößerung");
+        }
         else
         {
             var stroke = context switch
@@ -436,7 +500,7 @@ public partial class EditorView : UserControl
                 OptionsContext.Text when _textDraft is not null || _canvas.Selected is TextAnnotation =>
                     ToolSizes.StrokeForFont(TextTarget.FontSize / scaling),
                 OptionsContext.Counter when _canvas.Selected is CounterAnnotation c => ToolSizes.StrokeForCounterRadius(c.Radius / scaling),
-                OptionsContext.Line when _canvas.Selected is { } shape => shape.StrokeWidth / scaling,
+                OptionsContext.Line or OptionsContext.Freehand when _canvas.Selected is { } shape => shape.StrokeWidth / scaling,
                 _ => _canvas.StrokePoints,
             };
             _canvas.StrokePoints = Math.Clamp(stroke, ToolSizes.MinStroke, ToolSizes.MaxStroke);
@@ -462,7 +526,16 @@ public partial class EditorView : UserControl
         FilledStyleButton.IsChecked = text.Style == TextStyle.Filled;
         _updatingOptions = false;
 
+        var arrowStyle = _canvas.Selected is ArrowAnnotation selectedArrow ? selectedArrow.Style : _canvas.ArrowStyle;
+        ArrowStylePanel.IsVisible = context == OptionsContext.Line &&
+                                    (_canvas.Selected is ArrowAnnotation || (_canvas.Selected is null && _canvas.Tool == EditorTool.Arrow));
+        foreach (var (button, style) in ArrowStyleButtons) button.IsChecked = style == arrowStyle;
         ObscureStylePanel.IsVisible = context == OptionsContext.Obscure;
+        PenTypePanel.IsVisible = context == OptionsContext.Freehand;
+        var pen = _canvas.Selected is FreehandAnnotation selectedStroke ? selectedStroke.Pen : _canvas.PenType;
+        PenButton.IsChecked = pen == PenType.Pen;
+        HighlighterPenButton.IsChecked = pen == PenType.Highlighter;
+        OutlinePenButton.IsChecked = pen == PenType.Outline;
         TextOptionsPanel.IsVisible = context == OptionsContext.Text;
         PixelateStyleButton.IsChecked = _canvas.ObscureStyle == ObscureStyle.Pixelate;
         BlurStyleButton.IsChecked = _canvas.ObscureStyle == ObscureStyle.Blur;
@@ -478,6 +551,8 @@ public partial class EditorView : UserControl
             OptionsContext.Text => EditorTool.Text,
             OptionsContext.Counter => EditorTool.Counter,
             OptionsContext.Obscure => EditorTool.Pixelate,
+            OptionsContext.Freehand => EditorTool.Freehand,
+            OptionsContext.Magnifier => EditorTool.Magnifier,
             _ => _canvas.Selected switch
             {
                 RectangleAnnotation => EditorTool.Rectangle,
@@ -499,6 +574,8 @@ public partial class EditorView : UserControl
             OptionsContext.Obscure => string.Create(CultureInfo.CurrentCulture, $"Stärke {SizeSlider.Value:0}"),
             OptionsContext.Text => string.Create(CultureInfo.CurrentCulture, $"{ToolSizes.FontFor(SizeSlider.Value):0} pt"),
             OptionsContext.Counter => string.Create(CultureInfo.CurrentCulture, $"Größe {SizeSlider.Value:0.#}"),
+            OptionsContext.Freehand => string.Create(CultureInfo.CurrentCulture, $"Breite {SizeSlider.Value:0.#}"),
+            OptionsContext.Magnifier => string.Create(CultureInfo.CurrentCulture, $"Zoom {SizeSlider.Value:0.#}×"),
             _ => string.Create(CultureInfo.CurrentCulture, $"Linie {SizeSlider.Value:0.#}"),
         };
     }
@@ -559,7 +636,7 @@ public partial class EditorView : UserControl
                 CornerRadius = new CornerRadius(5),
                 VerticalAlignment = VerticalAlignment.Center,
                 Background = new SolidColorBrush(AnnotationRenderer.ToColor(annotation.Color)),
-                IsVisible = annotation is not (PixelateAnnotation or SpotlightAnnotation or ImageAnnotation),
+                IsVisible = annotation is not (PixelateAnnotation or SpotlightAnnotation or ImageAnnotation or MagnifierAnnotation),
             };
             var row = new Border
             {
@@ -590,7 +667,6 @@ public partial class EditorView : UserControl
 
     private static (string Icon, string Name) Describe(Annotation annotation) => annotation switch
     {
-        ArrowAnnotation => ("IconArrow", "Pfeil"),
         RectangleAnnotation => ("IconRectangle", "Rechteck"),
         EllipseAnnotation => ("IconEllipse", "Ellipse"),
         HighlightAnnotation => ("IconHighlight", "Marker"),
@@ -599,6 +675,17 @@ public partial class EditorView : UserControl
         PixelateAnnotation p => ("IconPixelate", p.Style == ObscureStyle.Blur ? "Verwischt" : "Verpixelt"),
         SpotlightAnnotation => ("IconSpotlight", "Spotlight"),
         ImageAnnotation => ("IconInsert", "Eingefügtes Bild"),
+        MagnifierAnnotation m => ("IconMagnifier", $"Lupe {m.Zoom:0.#}×"),
+        ArrowAnnotation { Style: ArrowStyle.Line } => ("IconArrowLine", "Linie"),
+        ArrowAnnotation { Style: ArrowStyle.Double } => ("IconArrowDouble", "Doppelpfeil"),
+        ArrowAnnotation { Style: ArrowStyle.Curved } => ("IconArrowCurved", "Gebogener Pfeil"),
+        ArrowAnnotation => ("IconArrow", "Pfeil"),
+        FreehandAnnotation f => ("IconFreehand", f.Pen switch
+        {
+            PenType.Highlighter => "Textmarker",
+            PenType.Outline => "Konturstift",
+            _ => "Freihand",
+        }),
         _ => ("IconSelect", annotation.GetType().Name),
     };
 
@@ -822,6 +909,9 @@ public partial class EditorView : UserControl
         defaults.Strikethrough = m.Strikethrough;
         defaults.Style = m.TextStyle;
         _canvas.ObscureStyle = m.ObscureStyle;
+        _canvas.PenType = m.Pen;
+        _canvas.ArrowStyle = m.ArrowStyle;
+        _canvas.MagnifierZoom = Math.Clamp(m.MagnifierZoom, ToolSizes.MinZoom, ToolSizes.MaxZoom);
         _canvas.ObscureStrength = m.ObscureStrength;
         _canvas.Color = ArgbColor.FromUInt(m.Color);
     }
@@ -830,6 +920,7 @@ public partial class EditorView : UserControl
     {
         EditorTool.Text => Memory.TextSize,
         EditorTool.Counter => Memory.CounterSize,
+        EditorTool.Freehand => RememberedPenWidth(_canvas.PenType),
         _ => Memory.StrokeByTool.TryGetValue(tool.ToString(), out var v) ? v : ToolSizes.DefaultStroke,
     };
 
@@ -844,6 +935,7 @@ public partial class EditorView : UserControl
             EllipseAnnotation => EditorTool.Ellipse,
             TextAnnotation => EditorTool.Text,
             CounterAnnotation => EditorTool.Counter,
+            FreehandAnnotation => EditorTool.Freehand,
             _ => _textDraft is not null ? EditorTool.Text : _canvas.Tool,
         };
         switch (tool)
@@ -857,6 +949,10 @@ public partial class EditorView : UserControl
             case EditorTool.Arrow or EditorTool.Rectangle or EditorTool.Ellipse:
                 m.StrokeByTool[tool.ToString()] = _canvas.StrokePoints;
                 break;
+            case EditorTool.Freehand:
+                var pen = _canvas.Selected is FreehandAnnotation stroke ? stroke.Pen : _canvas.PenType;
+                m.StrokeByTool[$"Freehand.{pen}"] = _canvas.StrokePoints;
+                break;
         }
         var t = _canvas.TextDefaults;
         m.FontFamily = t.FontFamily;
@@ -865,6 +961,7 @@ public partial class EditorView : UserControl
         m.Underline = t.Underline;
         m.Strikethrough = t.Strikethrough;
         m.TextStyle = t.Style;
+        m.MagnifierZoom = _canvas.MagnifierZoom;
         m.ObscureStyle = _canvas.ObscureStyle;
         m.ObscureStrength = _canvas.ObscureStrength;
         m.Color = _canvas.Color.Value;

@@ -21,13 +21,17 @@ internal static class BitmapConversions
         return bitmap;
     }
 
-    public static unsafe PixelBuffer ToPixelBuffer(this Bitmap bitmap)
+    /// <summary>
+    /// Pixels of a rendered bitmap as BGRA. Goes through PNG on purpose: CopyPixels returns
+    /// the backend's native layout (RGBA with Skia on macOS), which swapped red and blue.
+    /// </summary>
+    public static PixelBuffer ToPixelBuffer(this Bitmap bitmap) => PixelBuffer.Decode(bitmap.ToPng());
+
+    public static byte[] ToPng(this Bitmap bitmap)
     {
-        var size = bitmap.PixelSize;
-        var data = new byte[size.Width * size.Height * 4];
-        fixed (byte* p = data)
-            bitmap.CopyPixels(new PixelRect(size), (IntPtr)p, data.Length, size.Width * 4);
-        return new PixelBuffer(size.Width, size.Height, data);
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, PngBitmapEncoderOptions.Default);
+        return stream.ToArray();
     }
 
     public static NativeWindowHandle? GetNativeHandle(this TopLevel topLevel) =>

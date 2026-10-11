@@ -225,3 +225,60 @@ public class GrowthAndMemoryTests
     [Fact]
     public void NewText_IsNotBoldByDefault() => Assert.False(new TextAnnotation().Bold);
 }
+
+public class FreehandTests
+{
+    private static FreehandAnnotation Stroke() => new()
+    {
+        Points = [new PointD(10, 10), new PointD(50, 10), new PointD(50, 50)],
+        StrokeWidth = 4,
+    };
+
+    [Fact]
+    public void HitTest_FollowsTheStroke()
+    {
+        var stroke = Stroke();
+        Assert.True(stroke.HitTest(new PointD(30, 11), 2));
+        Assert.True(stroke.HitTest(new PointD(51, 30), 2));
+        Assert.False(stroke.HitTest(new PointD(25, 35), 2)); // inside the "corner", not on the line
+    }
+
+    [Fact]
+    public void Bounds_IncludeStrokeWidth()
+    {
+        Assert.Equal(new RectD(8, 8, 44, 44), Stroke().Bounds);
+    }
+
+    [Fact]
+    public void Undo_RestoresPositionAfterMove()
+    {
+        var doc = new AnnotationDocument();
+        var stroke = Stroke();
+        doc.Add(stroke);
+        doc.BeginChange();
+        stroke.Move(100, 0);
+        doc.NotifyChanged();
+        doc.Undo();
+        Assert.Equal(new PointD(10, 10), ((FreehandAnnotation)doc.Items[0]).Points[0]);
+    }
+
+    [Fact]
+    public void Session_KeepsFreehandStrokes()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"screencap-freehand-{Guid.NewGuid():N}");
+        try
+        {
+            var capture = new Capture(PixelBufferTests.Gradient(60, 60), 1);
+            capture.Annotations.Add(new FreehandAnnotation { Points = Stroke().Points, Pen = PenType.Highlighter, StrokeWidth = 12 });
+            var store = new SessionStore(directory);
+            store.Save([capture]);
+            var loaded = Assert.IsType<FreehandAnnotation>(Assert.Single(store.Load()).Annotations.Items.Single());
+            Assert.Equal(PenType.Highlighter, loaded.Pen);
+            Assert.Equal(3, loaded.Points.Count);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+}

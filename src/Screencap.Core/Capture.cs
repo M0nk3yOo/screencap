@@ -42,6 +42,22 @@ public sealed class Capture(PixelBuffer image, double scaling)
         }
     }
 
+    /// <summary>Application whose window was captured (best guess), e.g. "Safari".</summary>
+    public string? SourceApp { get; set; }
+
+    /// <summary>Title of the captured window (best guess).</summary>
+    public string? SourceTitle { get; set; }
+
+    /// <summary>"Safari – Startseite", for display.</summary>
+    public string? SourceDescription =>
+        (SourceApp, SourceTitle) switch
+        {
+            (null or "", null or "") => null,
+            (null or "", var title) => title,
+            (var app, null or "") => app,
+            var (app, title) => $"{app} – {title}",
+        };
+
     /// <summary>Where this screenshot was last saved, for "show in Finder/Explorer".</summary>
     public string? LastSavedPath { get; set; }
 

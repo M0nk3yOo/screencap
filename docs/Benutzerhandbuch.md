@@ -33,6 +33,7 @@ Screencap ist ein Screenshot-Werkzeug für **macOS** und **Windows** nach dem Vo
 4. Beim ersten Screenshot fragt macOS nach der Berechtigung **Bildschirmaufnahme**. Erlauben und Screencap danach einmal neu starten (Menüleiste → Screencap beenden, dann erneut öffnen).
 
 Screencap lebt in der **Menüleiste** (Sucher-Symbol). Solange der Editor offen ist, erscheint es zusätzlich im Dock.
+Beim ersten Start trägt sich Screencap als **Anmeldeobjekt** ein und startet künftig automatisch (abschaltbar in den Einstellungen oder unter Systemeinstellungen → Allgemein → Anmeldeobjekte).
 
 ### Windows (10 und 11)
 
@@ -41,7 +42,7 @@ Screencap lebt in der **Menüleiste** (Sucher-Symbol). Solange der Editor offen 
 3. **SmartScreen:** Da die App nicht signiert ist, warnt Windows beim ersten Start. **Weitere Informationen** → **Trotzdem ausführen**.
 4. Screencap erscheint im **Infobereich** der Taskleiste (ggf. über den Pfeil „Ausgeblendete Symbole“).
 
-> Tipp: Für den automatischen Start mit Windows eine Verknüpfung zu `Screencap.exe` in `shell:startup` legen (Win+R → `shell:startup`).
+Beim ersten Start trägt sich Screencap in den **Autostart** ein (abschaltbar in den Einstellungen oder im Task-Manager → Autostart-Apps). Wird `Screencap.exe` später verschoben, aktualisiert der nächste Start den Eintrag.
 
 ---
 
@@ -52,8 +53,9 @@ Screencap lebt in der **Menüleiste** (Sucher-Symbol). Solange der Editor offen 
 | Bereich aufnehmen | ⌘⇧2 | Strg+Umschalt+2 |
 | Vollbild aufnehmen | ⌘⇧1 | Strg+Umschalt+1 |
 | Text erkennen (Bereich) | ⌘⇧O | Strg+Umschalt+O |
+| Scroll-Aufnahme | ⌘⇧6 | Strg+Umschalt+6 |
 
-Alle drei Kürzel sind in den [Einstellungen](#10-einstellungen) änderbar. Alles ist außerdem über das Menü des Symbols in der Menüleiste bzw. im Infobereich erreichbar.
+Alle Kürzel sind in den [Einstellungen](#10-einstellungen) änderbar. Alles ist außerdem über das Menü des Symbols in der Menüleiste bzw. im Infobereich erreichbar.
 
 Der typische Ablauf:
 
@@ -69,9 +71,11 @@ Der typische Ablauf:
 
 Nach dem Tastenkürzel friert der Bildschirm ein und wird abgedunkelt.
 
-- **Ziehen** wählt den Bereich. Oben links wird die Größe in Pixeln angezeigt.
+- **Fenster:** Das Fenster unter dem Mauszeiger wird blau hervorgehoben (mit App-Name und Größe). Ein **Klick** nimmt genau dieses Fenster auf.
+- **Ziehen** wählt einen freien Bereich. Oben links wird die Größe in Pixeln angezeigt.
+- **Hilfslinien:** Vor dem Ziehen läuft ein Fadenkreuz über den ganzen Bildschirm; während des Ziehens werden alle vier Kanten der Auswahl über den ganzen Bildschirm verlängert. So lässt sich z. B. links ansetzen und prüfen, ob die Höhe auch für Inhalte weit rechts reicht.
 - Die **Lupe** neben dem Mauszeiger zeigt die Pixel stark vergrößert, dazu Farbe (Hex) und Koordinaten – für pixelgenaues Arbeiten.
-- **Klick ohne Ziehen** oder **Enter/Leertaste**: ganzer Bildschirm.
+- **Enter/Leertaste** oder Klick neben jedes Fenster: ganzer Bildschirm.
 - **Esc** oder **Rechtsklick**: abbrechen.
 
 Bei mehreren Monitoren wird auf jedem Monitor ausgewählt; der Bereich liegt immer auf einem Monitor.
@@ -79,6 +83,17 @@ Bei mehreren Monitoren wird auf jedem Monitor ausgewählt; der Bereich liegt imm
 ### Vollbild
 
 Nimmt den Monitor auf, auf dem sich der Mauszeiger befindet.
+
+### Scroll-Aufnahme
+
+Für Inhalte, die länger sind als der Bildschirm (Webseiten, Chats, Listen):
+
+1. **⌘⇧6** (bzw. Menü „Scroll-Aufnahme …“) und den Bereich wählen – meist ein Fenster per Klick.
+2. Ein blauer Rahmen markiert den Bereich, daneben erscheint ein kleines Steuerfenster.
+3. **Langsam nach unten scrollen.** Screencap nimmt laufend auf und setzt die Bilder nahtlos zusammen; das Steuerfenster zeigt Anzahl und Höhe.
+4. **Fertig** (oder Enter) öffnet das lange Bild im Editor, **Abbrechen** (Esc) verwirft es.
+
+Rahmen und Steuerfenster sind von der Aufnahme ausgenommen. Sehr starre, „klebende“ Kopfzeilen von Webseiten können sich an der Nahtstelle wiederholen.
 
 ### Text erkennen
 
@@ -111,6 +126,7 @@ Ein angepinnter Screenshot schwebt **immer im Vordergrund** – praktisch als Vo
 - **Mausrad**: zoomen · **0**: zurück auf 100 %
 - **⌘/Strg + Mausrad**: Deckkraft
 - **Überfahren** zeigt Knöpfe für **Kopieren**, **Bearbeiten** und **Schließen**
+- **Kopieren** (Knopf oder ⌘C) legt das Bild in die Zwischenablage und schließt den Pin
 - **Doppelklick** oder **E**: im Editor öffnen (der Pin bleibt offen)
 - **Rechtsklick**: Menü mit Kopieren, Speichern, Originalgröße, Deckkraft 100 %
 - **Esc**: schließen
@@ -170,7 +186,8 @@ Die Statusleiste zeigt außerdem Größe, Mausposition und Pixelfarbe.
 |---|---|---|
 | Auswählen | V | Elemente anklicken, verschieben, Griffe nutzen |
 | Zuschneiden | C | Rahmen an **Kanten/Ecken** ziehen, Ausschnitt verschieben oder neu aufziehen. **⌫** setzt zurück, **Enter** beendet. Nicht-destruktiv: jederzeit änderbar oder rückgängig. |
-| Pfeil | A | Ziehen. **Umschalt**: 45°-Schritte |
+| Freihand | F | Frei zeichnen; die Striche werden geglättet. **Umschalt**: gerade Linie (45°-Schritte). Drei Stifte in den Optionen: **Stift** (deckend), **Marker** (breit, durchscheinend – Überlappungen werden nicht dunkler), **Kontur** (mit hellem/dunklem Rand, auf jedem Hintergrund sichtbar). Jeder Stift merkt sich seine Breite. |
+| Pfeil | A | Ziehen. **Umschalt**: 45°-Schritte. Stile in den Optionen: **Standard**, **Offen**, **Doppelpfeil**, **Keil** (verjüngt), **Gebogen** (mit dem mittleren Griff biegen) und **Linie**. |
 | Rechteck | R | Ziehen. **Umschalt**: Quadrat |
 | Ellipse | O | Ziehen. **Umschalt**: Kreis |
 | Marker | H | Halbtransparente Markierung aufziehen |
@@ -178,6 +195,7 @@ Die Statusleiste zeigt außerdem Größe, Mausposition und Pixelfarbe.
 | Nummer | N | Klicken setzt die nächste Nummer. **Ziehen** zieht einen **Zeiger** heraus, der auf die gemeinte Stelle zeigt. |
 | Verpixeln / Verwischen | B | Bereich aufziehen. Erkannte Wörter sind blau umrandet: **Klick** auf ein Wort macht es unkenntlich, **⌥/Alt + Klick** die ganze Zeile. Stil (Verpixeln/Verwischen) und Stärke in den Optionen. |
 | Spotlight | S | Bereich aufziehen – alles andere wird abgedunkelt |
+| Lupe | L | Die Stelle mit einem Oval markieren (**Umschalt**: Kreis). Daneben erscheint die Vergrößerung, mit Linien verbunden. Markierung und Vergrößerung lassen sich **getrennt verschieben** und über ihre Griffe in der Größe ändern; Zoom 1,5–6× auch in den Optionen. |
 | Text markieren | E | Bereich aufziehen → Text und QR-Codes darin werden erkannt |
 | Pipette | I | Farbe im Bild anklicken: wird Zeichenfarbe (und färbt die Auswahl um), Hex-Wert landet in der Zwischenablage, danach zurück zum vorigen Werkzeug |
 
@@ -225,11 +243,27 @@ Ist der Inhalt ein Link, gibt es zusätzlich **Link öffnen**.
 - Dateinamen: `Screencap JJJJ-MM-TT HH-MM-SS.png` – sekundengenau; bei zwei Aufnahmen in derselben Sekunde wird „(2)“ angehängt.
 - Transparente Flächen bleiben in PNG erhalten; JPG bekommt Weiß.
 
+### Metadaten
+
+Beim Aufnehmen merkt sich Screencap, **welche App** und **welches Fenster** im Bereich vorne lag (bei Vollbild: das Fenster in der Bildschirmmitte). Gespeicherte Dateien enthalten:
+
+| Feld | PNG | JPG |
+|---|---|---|
+| Titel (Fenstertitel) | Text „Title“, XMP `dc:title` | EXIF `XPTitle`, XMP `dc:title` |
+| Beschreibung („App – Fenstertitel“) | Text „Description“, XMP `dc:description` | EXIF `ImageDescription`/`XPComment`, XMP |
+| App / Fenster einzeln | `Screencap:Application`, `Screencap:WindowTitle` | XMP `screencap:Application`/`WindowTitle` |
+| Programm, Aufnahmezeit | `Software`, `Creation Time` | EXIF `Software`, `DateTime` |
+
+Im Explorer erscheinen Titel und Kommentar unter *Eigenschaften → Details*, in der macOS-Vorschau unter *Werkzeuge → Informationen*. Im Editor steht die Herkunft im Fenstertitel und im Tooltip des Reiters. Die Zwischenablage enthält keine Metadaten.
+
 ---
 
 ## 10. Einstellungen
 
-Menü des Symbols → **Einstellungen …** (oder das Zahnrad im Editor).
+Menü des Symbols → **Einstellungen …** (oder das Zahnrad im Editor). Die Einstellungen sind in die Bereiche **Allgemein**, **Speichern**, **Darstellung** und **Tastenkürzel** gegliedert.
+
+**Allgemein**
+- Beim Anmelden automatisch starten
 
 **Nach der Aufnahme**
 - Automatisch in die Zwischenablage kopieren
@@ -247,6 +281,7 @@ Menü des Symbols → **Einstellungen …** (oder das Zahnrad im Editor).
 - Screenshots nach *n* Tagen löschen (Standard: 180). Betrifft **nur** Dateien, die Screencap selbst angelegt hat (Namensschema oben) – andere Dateien im Ordner bleiben unberührt.
 
 **Darstellung**
+- **Design**: Automatisch (folgt dem System, auch beim Umschalten), Hell oder Dunkel
 - **Glas-Effekt** des Editors (macOS: Vibrancy, Windows: Mica/Acrylic), 0 % = aus
 
 **Tastenkürzel**
@@ -281,7 +316,7 @@ Unter Windows steht **Strg** für **⌘**.
 | Anpinnen | P |
 | Auswahl löschen | ⌫ / Entf |
 | Auswahl aufheben / Auswählen-Werkzeug | Esc |
-| Werkzeuge | V C A R O H T N B S E I |
+| Werkzeuge | V C F A R O H T N B S L E I |
 
 ---
 
@@ -308,7 +343,7 @@ Kopiergeschützte Inhalte (z. B. Streaming-Dienste) lassen sich vom System aus n
 
 Dort liegen `settings.json`, die gespeicherte Sitzung und `screencap.log` mit Fehlermeldungen – bei Problemen hilft diese Datei weiter.
 
-**Bekannte Einschränkungen in Version 1.0**
-- Noch keine Scrolling-Aufnahme und keine automatische Fenster-Erkennung
+**Bekannte Einschränkungen**
+- Die Scroll-Aufnahme scrollt nicht selbst – gescrollt wird von Hand
 - Pins erscheinen unter Windows nur auf dem aktuellen virtuellen Desktop
 - Unter- und Durchstreichen ist während des Tippens noch nicht sichtbar, erst danach

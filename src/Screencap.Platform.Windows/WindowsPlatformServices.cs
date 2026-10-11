@@ -9,4 +9,6 @@ public sealed class WindowsPlatformServices : IPlatformServices
     public IWindowPlatform Windows { get; } = new WindowsWindowPlatform();
     public ITextRecognizer TextRecognizer { get; } = new WindowsTextRecognizer();
     public IImageClipboard Clipboard { get; } = new WindowsImageClipboard();
+    public IWindowInspector WindowInspector { get; } = new WindowsWindowInspector();
+    public IAutostart Autostart { get; } = new WindowsAutostart();
 }
