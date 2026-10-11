@@ -185,7 +185,7 @@ Die Statusleiste zeigt außerdem Größe, Mausposition und Pixelfarbe.
 | Werkzeug | Taste | Bedienung |
 |---|---|---|
 | Auswählen | V | Elemente anklicken, verschieben, Griffe nutzen |
-| Zuschneiden | C | Rahmen an **Kanten/Ecken** ziehen, Ausschnitt verschieben oder neu aufziehen. **⌫** setzt zurück, **Enter** beendet. Nicht-destruktiv: jederzeit änderbar oder rückgängig. |
+| Zuschneiden | C | Rahmen an **Kanten/Ecken** ziehen, Ausschnitt verschieben oder neu aufziehen. Unter dem Werkzeug: **Zuschneiden** (Enter) übernimmt, **Abbrechen** (Esc) verwirft die Änderungen, **Zurücksetzen** (⌫) zeigt wieder das ganze Bild. Nicht-destruktiv: jederzeit änderbar oder rückgängig. |
 | Freihand | F | Frei zeichnen; die Striche werden geglättet. **Umschalt**: gerade Linie (45°-Schritte). Drei Stifte in den Optionen: **Stift** (deckend), **Marker** (breit, durchscheinend – Überlappungen werden nicht dunkler), **Kontur** (mit hellem/dunklem Rand, auf jedem Hintergrund sichtbar). Jeder Stift merkt sich seine Breite. |
 | Pfeil | A | Ziehen. **Umschalt**: 45°-Schritte. Stile in den Optionen: **Standard**, **Offen**, **Doppelpfeil**, **Keil** (verjüngt), **Gebogen** (mit dem mittleren Griff biegen) und **Linie**. |
 | Rechteck | R | Ziehen. **Umschalt**: Quadrat |

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 – 2026-10-11
+
+- Zuschneiden: Knöpfe „Zuschneiden“, „Abbrechen“ und „Zurücksetzen“ unter dem Werkzeug
+
 ## 1.0.1 – 2026-10-11
 
 - Autostart beim Anmelden (macOS: Anmeldeobjekt, Windows: Autostart), beim ersten Start aktiv, abschaltbar
