@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -73,6 +74,36 @@ public sealed class NewFeatureTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(EditorTool.Arrow, canvas.Tool);
         Assert.Equal(crop.Width * canvas.DisplayScale, canvas.DesiredSize.Width, 1);
+    }
+
+    [AvaloniaFact]
+    public void CropButtons_ApplyCancelAndReset()
+    {
+        var capture = new Capture(TestImages.Solid(400, 300), 1);
+        var (_, main, canvas) = OpenEditor(capture);
+        Button Named(string name) => main.GetVisualDescendants().OfType<Button>().Single(b => b.Name == name);
+        var s = canvas.DisplayScale;
+
+        // Crop, then confirm with the button.
+        PressKey(main, PhysicalKey.C);
+        Assert.True(Named("CropApplyButton").IsEffectivelyVisible);
+        Drag(main, canvas, new Point(40 * s, 30 * s), new Point(240 * s, 180 * s));
+        Named("CropApplyButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(EditorTool.Arrow, canvas.Tool);
+        var applied = Assert.NotNull(capture.Annotations.Crop);
+
+        // Change it again, but cancel: the confirmed crop comes back.
+        PressKey(main, PhysicalKey.C);
+        Drag(main, canvas, new Point(60 * s, 60 * s), new Point(120 * s, 120 * s));
+        Assert.NotEqual(applied, capture.Annotations.Crop);
+        Named("CropCancelButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(applied, capture.Annotations.Crop);
+        Assert.Equal(EditorTool.Arrow, canvas.Tool);
+
+        // Reset shows the whole image again.
+        PressKey(main, PhysicalKey.C);
+        Named("CropResetButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Null(capture.Annotations.Crop);
     }
 
     [AvaloniaFact]

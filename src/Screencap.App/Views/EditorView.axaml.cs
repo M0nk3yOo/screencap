@@ -56,6 +56,8 @@ public partial class EditorView : UserControl
     private bool _updatingOptions;
     private bool _fitToWindow = true;
     private EditorTool _toolBeforeCrop = EditorTool.Arrow;
+    /// <summary>Crop when the crop tool was opened, for "Abbrechen".</summary>
+    private IntRect? _cropBeforeEditing;
     private EditorTool _toolBeforePicker = EditorTool.Arrow;
 
     /// <summary>
@@ -299,6 +301,7 @@ public partial class EditorView : UserControl
     {
         None,
         Line,
+        Crop,
         Freehand,
         Magnifier,
         Text,
@@ -326,6 +329,7 @@ public partial class EditorView : UserControl
             {
                 EditorTool.Arrow or EditorTool.Rectangle or EditorTool.Ellipse => OptionsContext.Line,
                 EditorTool.Freehand => OptionsContext.Freehand,
+                EditorTool.Crop => OptionsContext.Crop,
                 EditorTool.Magnifier => OptionsContext.Magnifier,
                 EditorTool.Text => OptionsContext.Text,
                 EditorTool.Counter => OptionsContext.Counter,
@@ -371,6 +375,9 @@ public partial class EditorView : UserControl
         };
         foreach (var (button, style) in ArrowStyleButtons)
             button.Click += (_, _) => SetArrowStyle(style);
+        CropApplyButton.Click += (_, _) => ApplyCrop();
+        CropCancelButton.Click += (_, _) => CancelCrop();
+        CropResetButton.Click += (_, _) => Capture.Annotations.SetCrop(null);
         PenButton.Click += (_, _) => SetPen(PenType.Pen);
         HighlighterPenButton.Click += (_, _) => SetPen(PenType.Highlighter);
         OutlinePenButton.Click += (_, _) => SetPen(PenType.Outline);
@@ -434,6 +441,16 @@ public partial class EditorView : UserControl
         RememberOptions();
     }
 
+    /// <summary>Keeps the crop as dragged and returns to the previous tool, showing the result.</summary>
+    private void ApplyCrop() => SelectTool(_toolBeforeCrop);
+
+    /// <summary>Restores the crop from when the tool was opened.</summary>
+    private void CancelCrop()
+    {
+        Capture.Annotations.SetCrop(_cropBeforeEditing);
+        SelectTool(_toolBeforeCrop);
+    }
+
     /// <summary>Switches the pen; each pen keeps its own width. A selected stroke changes too.</summary>
     private void SetPen(PenType pen)
     {
@@ -468,6 +485,8 @@ public partial class EditorView : UserControl
         var context = CurrentOptionsContext;
         OptionsBar.IsVisible = context != OptionsContext.None && !_optionsDismissed;
         if (!OptionsBar.IsVisible) return;
+        CropPanel.IsVisible = context == OptionsContext.Crop;
+        SizePanel.IsVisible = context != OptionsContext.Crop;
 
         var scaling = Capture.Scaling;
         _updatingOptions = true;
@@ -553,6 +572,7 @@ public partial class EditorView : UserControl
             OptionsContext.Obscure => EditorTool.Pixelate,
             OptionsContext.Freehand => EditorTool.Freehand,
             OptionsContext.Magnifier => EditorTool.Magnifier,
+            OptionsContext.Crop => EditorTool.Crop,
             _ => _canvas.Selected switch
             {
                 RectangleAnnotation => EditorTool.Rectangle,
@@ -738,7 +758,11 @@ public partial class EditorView : UserControl
     private void SelectTool(EditorTool tool)
     {
         CommitTextEdit();
-        if (tool == EditorTool.Crop && _canvas.Tool != EditorTool.Crop) _toolBeforeCrop = _canvas.Tool;
+        if (tool == EditorTool.Crop && _canvas.Tool != EditorTool.Crop)
+        {
+            _toolBeforeCrop = _canvas.Tool;
+            _cropBeforeEditing = Capture.Annotations.Crop;
+        }
         if (tool == EditorTool.ColorPicker && _canvas.Tool != EditorTool.ColorPicker) _toolBeforePicker = _canvas.Tool;
         _optionsDismissed = false;
         _canvas.Tool = tool;
@@ -1346,8 +1370,11 @@ public partial class EditorView : UserControl
                 case Key.Delete or Key.Back:
                     Capture.Annotations.SetCrop(null);
                     return true;
-                case Key.Enter or Key.Escape:
-                    SelectTool(_toolBeforeCrop);
+                case Key.Enter:
+                    ApplyCrop();
+                    return true;
+                case Key.Escape:
+                    CancelCrop();
                     return true;
             }
         }
@@ -1402,7 +1429,7 @@ public partial class EditorView : UserControl
         }
         if (_canvas.Tool == EditorTool.Crop)
         {
-            StatusText.Text = "Rahmen an Kanten und Ecken ziehen, verschieben oder neu aufziehen   ·   ⌫ setzt zurück   ·   Enter beendet";
+            StatusText.Text = "Rahmen an Kanten und Ecken ziehen, verschieben oder neu aufziehen   ·   Enter = Zuschneiden   ·   Esc = Abbrechen";
             return;
         }
         if (_canvas.Tool == EditorTool.Pixelate && _canvas.TextRegions is { Count: > 0 })

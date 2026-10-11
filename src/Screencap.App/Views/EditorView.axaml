@@ -181,10 +181,23 @@
             </ToggleButton>
             <Border Classes="divider" Margin="4,6" />
           </StackPanel>
-          <TextBlock x:Name="SizeLabel" VerticalAlignment="Center" FontSize="12" MinWidth="62"
-                     Foreground="{DynamicResource ScMutedBrush}" Margin="4,0,0,0" />
-          <Slider x:Name="SizeSlider" Width="120" VerticalAlignment="Center" Margin="0,-6,4,-6"
-                  SmallChange="0.5" LargeChange="1" />
+          <StackPanel x:Name="SizePanel" Orientation="Horizontal" Spacing="6">
+            <TextBlock x:Name="SizeLabel" VerticalAlignment="Center" FontSize="12" MinWidth="62"
+                       Foreground="{DynamicResource ScMutedBrush}" Margin="4,0,0,0" />
+            <Slider x:Name="SizeSlider" Width="120" VerticalAlignment="Center" Margin="0,-6,4,-6"
+                    SmallChange="0.5" LargeChange="1" />
+          </StackPanel>
+          <!-- Crop: confirm without having to pick another tool. -->
+          <StackPanel x:Name="CropPanel" Orientation="Horizontal" Spacing="6" Margin="4,0">
+            <Button x:Name="CropResetButton" Classes="flat" Content="Zurücksetzen" FontSize="12" ToolTip.Tip="Wieder das ganze Bild (⌫)" />
+            <Button x:Name="CropCancelButton" Classes="flat" Content="Abbrechen" FontSize="12" ToolTip.Tip="Änderungen am Zuschnitt verwerfen (Esc)" />
+            <Button x:Name="CropApplyButton" Classes="accent" Padding="12,5" CornerRadius="7" ToolTip.Tip="Zuschnitt übernehmen (Enter)">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconCrop}" Width="13" Height="13" />
+                <TextBlock Text="Zuschneiden" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
         </StackPanel>
       </Border>
     </Panel>
