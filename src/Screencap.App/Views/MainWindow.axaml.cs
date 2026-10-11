@@ -40,10 +40,22 @@ public partial class MainWindow : Window
         _newCaptureButton = CreateNewCaptureButton();
         if (app is null) return;
 
-        // Room for the macOS traffic lights / the Windows caption buttons.
-        LeftInset.Width = AppController.IsMac ? 78 : 8;
-        RightInset.Width = AppController.IsMac ? 8 : 140;
-        WindowDecorationProperties.SetElementRole(DragArea, WindowDecorationsElementRole.TitleBar);
+        if (AppController.IsMac)
+        {
+            // Tabs live in the title bar, next to the traffic lights.
+            LeftInset.Width = 78;
+            RightInset.Width = 8;
+            WindowDecorationProperties.SetElementRole(DragArea, WindowDecorationsElementRole.TitleBar);
+        }
+        else
+        {
+            // Windows keeps its native title bar: the extended, Avalonia-drawn one adds a title
+            // and a full-screen button that overlapped the tabs. The tabs get their own row.
+            ExtendClientAreaToDecorationsHint = false;
+            TitleBar.Height = 42;
+            LeftInset.Width = 6;
+            RightInset.Width = 6;
+        }
 
         EmptyHint.Text = $"Bereich aufnehmen mit {app.FormatHotkey(app.Settings.RegionHotkey)}, " +
                          $"Vollbild mit {app.FormatHotkey(app.Settings.FullscreenHotkey)}";
@@ -199,7 +211,8 @@ public partial class MainWindow : Window
                 },
             },
         };
-        ToolTip.SetTip(chip, $"{capture.CreatedAt:dd.MM.yyyy HH:mm:ss} · {capture.Image.Width} × {capture.Image.Height} px");
+        var source = capture.SourceDescription is { } description ? $"{description}\n" : "";
+        ToolTip.SetTip(chip, $"{source}{capture.CreatedAt:dd.MM.yyyy HH:mm:ss} · {capture.Image.Width} × {capture.Image.Height} px");
         chip.ContextMenu = CreateTabMenu(capture);
         chip.PointerPressed += (_, e) =>
         {
@@ -352,7 +365,7 @@ public partial class MainWindow : Window
 
     private void UpdateTitle() =>
         Title = _selected is { } t
-            ? $"Screencap – {t.Capture.CreatedAt:dd.MM.yyyy HH:mm:ss}"
+            ? $"Screencap – {t.Capture.SourceDescription ?? t.Capture.CreatedAt.ToString("dd.MM.yyyy HH:mm:ss")}"
             : "Screencap";
 
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)

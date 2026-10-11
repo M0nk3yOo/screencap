@@ -10,10 +10,9 @@
         WindowStartupLocation="Manual"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
-        RequestedThemeVariant="Dark"
         Opacity="0">
-  <Border Background="#F2232427" CornerRadius="12" Padding="8"
-          BorderBrush="#33FFFFFF" BorderThickness="1">
+  <Border Background="{DynamicResource ScHudBrush}" CornerRadius="12" Padding="8"
+          BorderBrush="{DynamicResource ScHudBorderBrush}" BorderThickness="1">
     <StackPanel Spacing="8">
       <Panel>
         <Border x:Name="ImageHost" CornerRadius="6" ClipToBounds="True" Cursor="SizeAll"

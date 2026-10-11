@@ -14,7 +14,8 @@ public sealed class SessionStore(string directory)
 {
     private const string ManifestName = "session.json";
 
-    private sealed record Entry(Guid Id, DateTimeOffset CreatedAt, double Scaling, List<Annotation> Annotations, IntRect? Crop = null);
+    private sealed record Entry(Guid Id, DateTimeOffset CreatedAt, double Scaling, List<Annotation> Annotations, IntRect? Crop = null,
+        string? SourceApp = null, string? SourceTitle = null);
 
     public void Save(IReadOnlyList<Capture> captures)
     {
@@ -28,7 +29,7 @@ public sealed class SessionStore(string directory)
         }
 
         var entries = captures
-            .Select(c => new Entry(c.Id, c.CreatedAt, c.Scaling, c.Annotations.Items.ToList(), c.Annotations.Crop))
+            .Select(c => new Entry(c.Id, c.CreatedAt, c.Scaling, c.Annotations.Items.ToList(), c.Annotations.Crop, c.SourceApp, c.SourceTitle))
             .ToList();
         AtomicFile.WriteAllText(Path.Combine(directory, ManifestName),
             JsonSerializer.Serialize(entries, SettingsStore.JsonOptions));
@@ -65,6 +66,8 @@ public sealed class SessionStore(string directory)
                 Id = entry.Id,
                 CreatedAt = entry.CreatedAt,
                 Annotations = new AnnotationDocument(entry.Annotations, entry.Crop),
+                SourceApp = entry.SourceApp,
+                SourceTitle = entry.SourceTitle,
             });
         }
         return result;

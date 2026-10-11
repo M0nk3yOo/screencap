@@ -5,13 +5,22 @@ using Screencap.Core.Settings;
 
 namespace Screencap.App.Tests;
 
-internal sealed class FakePlatform : IPlatformServices, IScreenCapturer, IGlobalHotkeys, IWindowPlatform, ITextRecognizer, IImageClipboard
+internal sealed class FakePlatform : IPlatformServices, IScreenCapturer, IGlobalHotkeys, IWindowPlatform, ITextRecognizer, IImageClipboard, IWindowInspector, IAutostart
 {
     public IScreenCapturer Capturer => this;
     public IGlobalHotkeys Hotkeys => this;
     public IWindowPlatform Windows => this;
     public ITextRecognizer TextRecognizer => this;
     public IImageClipboard Clipboard => this;
+    public IWindowInspector WindowInspector => this;
+    public IAutostart Autostart => this;
+
+    public IReadOnlyList<WindowInfo> Windows_ { get; set; } = [];
+    public IReadOnlyList<WindowInfo> GetWindows() => Windows_;
+
+    public bool IsSupported { get; set; } = true;
+    public bool IsEnabled { get; private set; }
+    public void SetEnabled(bool enabled) => IsEnabled = enabled;
 
     public PixelBuffer? ClipboardImage { get; private set; }
     public bool DockIconVisible { get; private set; }
@@ -26,8 +35,11 @@ internal sealed class FakePlatform : IPlatformServices, IScreenCapturer, IGlobal
 
     public bool HasPermission() => true;
     public void RequestPermission() { }
+    /// <summary>Optional scripted captures (e.g. a page being scrolled); default is a solid image.</summary>
+    public Func<ScreenInfo, PixelBuffer>? CaptureProvider { get; set; }
+
     public Task<PixelBuffer> CaptureAsync(ScreenInfo screen, CancellationToken cancellationToken = default) =>
-        Task.FromResult(TestImages.Solid(screen.Bounds.Width, screen.Bounds.Height));
+        Task.FromResult(CaptureProvider?.Invoke(screen) ?? TestImages.Solid(screen.Bounds.Width, screen.Bounds.Height));
 
     public bool TryRegister(Hotkey hotkey, Action onPressed) => true;
     public void UnregisterAll() { }
@@ -35,6 +47,7 @@ internal sealed class FakePlatform : IPlatformServices, IScreenCapturer, IGlobal
 
     public void ConfigureOverlay(NativeWindowHandle window, IntRect screenBounds) { }
     public void ConfigurePinned(NativeWindowHandle window) { }
+    public void ExcludeFromCapture(NativeWindowHandle window) { }
     public void ActivateApplication() { }
     public PointD GetCursorPosition() => default;
 }

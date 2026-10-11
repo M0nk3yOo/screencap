@@ -9,4 +9,6 @@ public sealed class MacPlatformServices : IPlatformServices
     public IWindowPlatform Windows { get; } = new MacWindowPlatform();
     public ITextRecognizer TextRecognizer { get; } = new MacTextRecognizer();
     public IImageClipboard Clipboard { get; } = new MacImageClipboard();
+    public IWindowInspector WindowInspector { get; } = new MacWindowInspector();
+    public IAutostart Autostart { get; } = new MacAutostart();
 }

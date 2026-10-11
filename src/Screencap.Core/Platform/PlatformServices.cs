@@ -21,6 +21,28 @@ public interface IPlatformServices
     IWindowPlatform Windows { get; }
     ITextRecognizer TextRecognizer { get; }
     IImageClipboard Clipboard { get; }
+    IWindowInspector WindowInspector { get; }
+    IAutostart Autostart { get; }
+}
+
+/// <summary>A visible application window; bounds in the toolkit's screen coordinates.</summary>
+public sealed record WindowInfo(string App, string Title, IntRect Bounds);
+
+public interface IWindowInspector
+{
+    /// <summary>Visible windows of other apps, frontmost first. Empty if the OS doesn't allow it.</summary>
+    IReadOnlyList<WindowInfo> GetWindows();
+}
+
+/// <summary>Start Screencap when the user logs in.</summary>
+public interface IAutostart
+{
+    /// <summary>False when running from a development build that can't be registered.</summary>
+    bool IsSupported { get; }
+
+    bool IsEnabled { get; }
+
+    void SetEnabled(bool enabled);
 }
 
 /// <summary>
@@ -70,6 +92,9 @@ public interface IWindowPlatform
     /// Needed because macOS shrinks borderless windows to the area between menu bar and Dock.
     /// </summary>
     void ConfigureOverlay(NativeWindowHandle window, IntRect screenBounds);
+
+    /// <summary>Hides one of our own windows from screen captures (scroll capture controls).</summary>
+    void ExcludeFromCapture(NativeWindowHandle window);
 
     /// <summary>Keeps a pinned screenshot visible on all spaces / virtual desktops.</summary>
     void ConfigurePinned(NativeWindowHandle window);

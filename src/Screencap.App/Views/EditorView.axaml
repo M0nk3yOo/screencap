@@ -124,6 +124,27 @@
       <Border x:Name="OptionsBar" Classes="popup" HorizontalAlignment="Left" VerticalAlignment="Top"
               Margin="10,8,0,0" IsVisible="False">
         <StackPanel Orientation="Horizontal" Spacing="6">
+          <StackPanel x:Name="ArrowStylePanel" Orientation="Horizontal" Spacing="1">
+            <ToggleButton x:Name="ArrowStandardButton" Classes="flat" ToolTip.Tip="Standard – gefüllte Spitze"><PathIcon Data="{StaticResource IconArrowFilled}" /></ToggleButton>
+            <ToggleButton x:Name="ArrowOpenButton" Classes="flat" ToolTip.Tip="Offene Spitze"><PathIcon Data="{StaticResource IconArrow}" /></ToggleButton>
+            <ToggleButton x:Name="ArrowDoubleButton" Classes="flat" ToolTip.Tip="Doppelpfeil"><PathIcon Data="{StaticResource IconArrowDouble}" /></ToggleButton>
+            <ToggleButton x:Name="ArrowWedgeButton" Classes="flat" ToolTip.Tip="Keil – verjüngt"><PathIcon Data="{StaticResource IconArrowWedge}" /></ToggleButton>
+            <ToggleButton x:Name="ArrowCurvedButton" Classes="flat" ToolTip.Tip="Gebogen – mit dem mittleren Griff biegen"><PathIcon Data="{StaticResource IconArrowCurved}" /></ToggleButton>
+            <ToggleButton x:Name="ArrowLineButton" Classes="flat" ToolTip.Tip="Linie ohne Spitze"><PathIcon Data="{StaticResource IconArrowLine}" /></ToggleButton>
+            <Border Classes="divider" Margin="4,6" />
+          </StackPanel>
+          <StackPanel x:Name="PenTypePanel" Orientation="Horizontal" Spacing="1">
+            <ToggleButton x:Name="PenButton" Classes="flat" ToolTip.Tip="Stift – deckende Linie">
+              <TextBlock Text="Stift" FontSize="12" />
+            </ToggleButton>
+            <ToggleButton x:Name="HighlighterPenButton" Classes="flat" ToolTip.Tip="Textmarker – breit und durchscheinend">
+              <TextBlock Text="Marker" FontSize="12" />
+            </ToggleButton>
+            <ToggleButton x:Name="OutlinePenButton" Classes="flat" ToolTip.Tip="Konturstift – mit Rand, auf jedem Hintergrund sichtbar">
+              <TextBlock Text="Kontur" FontSize="12" />
+            </ToggleButton>
+            <Border Classes="divider" Margin="4,6" />
+          </StackPanel>
           <StackPanel x:Name="ObscureStylePanel" Orientation="Horizontal" Spacing="1">
             <ToggleButton x:Name="PixelateStyleButton" Classes="flat" ToolTip.Tip="Verpixeln">
               <PathIcon Data="{StaticResource IconPixelate}" />

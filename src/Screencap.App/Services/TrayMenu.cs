@@ -15,6 +15,7 @@ internal static class TrayMenu
         {
             Item("Bereich aufnehmen", () => _ = app.CaptureRegionAsync(), app.Settings.RegionHotkey),
             Item("Vollbild aufnehmen", () => _ = app.CaptureFullscreenAsync(), app.Settings.FullscreenHotkey),
+            Item("Scroll-Aufnahme …", () => _ = app.CaptureScrollingAsync(), app.Settings.ScrollHotkey),
             Item("Text erkennen …", () => _ = app.CaptureTextAsync(), app.Settings.OcrHotkey),
             new NativeMenuItemSeparator(),
             Item("Hauptfenster öffnen", () => app.ShowMainWindow()),

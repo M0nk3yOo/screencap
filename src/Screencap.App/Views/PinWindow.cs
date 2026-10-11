@@ -189,7 +189,7 @@ internal sealed class PinWindow : Window
                 Spacing = 1,
                 Children =
                 {
-                    ToolButton("IconCopy", $"Kopieren ({command}C)", () => _ = CopyAsync()),
+                    ToolButton("IconCopy", $"Kopieren und schließen ({command}C)", () => _ = CopyAsync()),
                     ToolButton("IconEdit", "Bearbeiten (Doppelklick)", Edit),
                     ToolButton("IconClose", "Schließen (Esc)", Close),
                 },
@@ -281,7 +281,7 @@ internal sealed class PinWindow : Window
         {
             Items =
             {
-                Item("Kopieren", () => _ = CopyAsync()),
+                Item("Kopieren und schließen", () => _ = CopyAsync()),
                 Item("Speichern", () => _ = _app.QuickSaveAsync(_capture, this)),
                 Item("Bearbeiten", Edit),
                 new Separator(),
@@ -293,10 +293,19 @@ internal sealed class PinWindow : Window
         };
     }
 
+    /// <summary>Copying is usually the last step with a pin, so the pin closes afterwards.</summary>
     private async Task CopyAsync()
     {
-        await _app.CopyAsync(_capture, this);
-        ShowLabel("Kopiert");
+        try
+        {
+            await _app.CopyAsync(_capture, this);
+            Close();
+        }
+        catch (Exception e)
+        {
+            CrashLog.Write("Copy (pin)", e);
+            ShowLabel("Kopieren fehlgeschlagen");
+        }
     }
 
     // The pin stays open: it is often used as a reference while editing.

@@ -27,8 +27,10 @@ internal static class AnnotationRenderer
         foreach (var p in items.OfType<PixelateAnnotation>()) RenderPixelate(dc, p, source);
         RenderSpotlights(dc, items.OfType<SpotlightAnnotation>().ToList(), source);
         foreach (var a in items)
-            if (a is not (PixelateAnnotation or SpotlightAnnotation))
-                Render(dc, a);
+        {
+            if (a is MagnifierAnnotation lens) RenderMagnifier(dc, lens, source);
+            else if (a is not (PixelateAnnotation or SpotlightAnnotation)) Render(dc, a);
+        }
     }
 
     public static void Render(DrawingContext dc, Annotation annotation)
@@ -55,6 +57,9 @@ internal static class AnnotationRenderer
                 break;
             case ImageAnnotation image:
                 RenderImage(dc, image);
+                break;
+            case FreehandAnnotation stroke:
+                RenderFreehand(dc, stroke);
                 break;
         }
     }
@@ -93,32 +98,132 @@ internal static class AnnotationRenderer
 
     private static void RenderArrow(DrawingContext dc, ArrowAnnotation arrow)
     {
-        var dx = arrow.End.X - arrow.Start.X;
-        var dy = arrow.End.Y - arrow.Start.Y;
-        var length = Math.Sqrt(dx * dx + dy * dy);
-        if (length < 1) return;
+        var start = arrow.Start;
+        var end = arrow.End;
+        if (Math.Abs(end.X - start.X) + Math.Abs(end.Y - start.Y) < 1) return;
+        var brush = new SolidColorBrush(ToColor(arrow.Color));
+        var pen = CreatePen(arrow.Color, arrow.StrokeWidth);
+        var headLength = Math.Max(arrow.StrokeWidth * 4, 12);
 
-        var ux = dx / length;
-        var uy = dy / length;
-        var headLength = Math.Min(Math.Max(arrow.StrokeWidth * 4, 12), length);
-        var headHalfWidth = headLength * 0.6;
-        var baseX = arrow.End.X - ux * headLength;
-        var baseY = arrow.End.Y - uy * headLength;
-
-        // The shaft ends inside the head so the round cap doesn't poke out of the tip.
-        var shaftEnd = new Point(baseX + ux * headLength * 0.3, baseY + uy * headLength * 0.3);
-        dc.DrawLine(CreatePen(arrow.Color, arrow.StrokeWidth), new Point(arrow.Start.X, arrow.Start.Y), shaftEnd);
-
-        var head = new StreamGeometry();
-        using (var ctx = head.Open())
+        switch (arrow.Style)
         {
-            ctx.BeginFigure(new Point(arrow.End.X, arrow.End.Y), true);
-            ctx.LineTo(new Point(baseX - uy * headHalfWidth, baseY + ux * headHalfWidth));
-            ctx.LineTo(new Point(baseX + uy * headHalfWidth, baseY - ux * headHalfWidth));
-            ctx.EndFigure(true);
+            case ArrowStyle.Line:
+                dc.DrawLine(pen, ToPoint(start), ToPoint(end));
+                break;
+
+            case ArrowStyle.Open:
+            {
+                var (ux, uy) = Direction(start, end);
+                var spread = headLength * 0.65;
+                var a = new Point(end.X - ux * headLength - uy * spread, end.Y - uy * headLength + ux * spread);
+                var b = new Point(end.X - ux * headLength + uy * spread, end.Y - uy * headLength - ux * spread);
+                dc.DrawLine(pen, ToPoint(start), ToPoint(end));
+                var head = new StreamGeometry();
+                using (var ctx = head.Open())
+                {
+                    ctx.BeginFigure(a, false);
+                    ctx.LineTo(ToPoint(end));
+                    ctx.LineTo(b);
+                    ctx.EndFigure(false);
+                }
+                dc.DrawGeometry(null, pen, head);
+                break;
+            }
+
+            case ArrowStyle.Double:
+            {
+                var length = Distance(start, end);
+                var head = Math.Min(headLength, length / 2);
+                var (ux, uy) = Direction(start, end);
+                var shaftStart = new Point(start.X + ux * head * 0.7, start.Y + uy * head * 0.7);
+                var shaftEnd = new Point(end.X - ux * head * 0.7, end.Y - uy * head * 0.7);
+                dc.DrawLine(pen, shaftStart, shaftEnd);
+                dc.DrawGeometry(brush, null, Head(end, ux, uy, head));
+                dc.DrawGeometry(brush, null, Head(start, -ux, -uy, head));
+                break;
+            }
+
+            case ArrowStyle.Wedge:
+            {
+                // One filled shape: a point at the tail widening into the head.
+                var (ux, uy) = Direction(start, end);
+                var length = Distance(start, end);
+                var head = Math.Min(headLength * 1.1, length * 0.6);
+                var shaftHalf = arrow.StrokeWidth * 0.9;
+                var headHalf = head * 0.6;
+                var bx = end.X - ux * head;
+                var by = end.Y - uy * head;
+                var wedge = new StreamGeometry();
+                using (var ctx = wedge.Open())
+                {
+                    ctx.BeginFigure(ToPoint(start), true);
+                    ctx.LineTo(new Point(bx - uy * shaftHalf, by + ux * shaftHalf));
+                    ctx.LineTo(new Point(bx - uy * headHalf, by + ux * headHalf));
+                    ctx.LineTo(ToPoint(end));
+                    ctx.LineTo(new Point(bx + uy * headHalf, by - ux * headHalf));
+                    ctx.LineTo(new Point(bx + uy * shaftHalf, by - ux * shaftHalf));
+                    ctx.EndFigure(true);
+                }
+                dc.DrawGeometry(brush, null, wedge);
+                break;
+            }
+
+            case ArrowStyle.Curved when arrow.IsCurved:
+            {
+                var control = arrow.Control!.Value;
+                // The head points along the curve's tangent at the end.
+                var (ux, uy) = Direction(control, end);
+                var head = Math.Min(headLength, Distance(start, end) * 0.5);
+                var shaftEnd = new Point(end.X - ux * head * 0.7, end.Y - uy * head * 0.7);
+                var curve = new StreamGeometry();
+                using (var ctx = curve.Open())
+                {
+                    ctx.BeginFigure(ToPoint(start), false);
+                    ctx.QuadraticBezierTo(ToPoint(control), shaftEnd);
+                    ctx.EndFigure(false);
+                }
+                dc.DrawGeometry(null, pen, curve);
+                dc.DrawGeometry(brush, null, Head(end, ux, uy, head));
+                break;
+            }
+
+            default:
+            {
+                var (ux, uy) = Direction(start, end);
+                var head = Math.Min(headLength, Distance(start, end));
+                // The shaft ends inside the head so the round cap doesn't poke out of the tip.
+                var shaftEnd = new Point(end.X - ux * head * 0.7, end.Y - uy * head * 0.7);
+                dc.DrawLine(pen, ToPoint(start), shaftEnd);
+                dc.DrawGeometry(brush, null, Head(end, ux, uy, head));
+                break;
+            }
         }
-        dc.DrawGeometry(new SolidColorBrush(ToColor(arrow.Color)), null, head);
     }
+
+    /// <summary>Filled triangle with its tip at <paramref name="tip"/>, pointing along (ux, uy).</summary>
+    private static StreamGeometry Head(PointD tip, double ux, double uy, double length)
+    {
+        var half = length * 0.6;
+        var bx = tip.X - ux * length;
+        var by = tip.Y - uy * length;
+        var head = new StreamGeometry();
+        using var ctx = head.Open();
+        ctx.BeginFigure(ToPoint(tip), true);
+        ctx.LineTo(new Point(bx - uy * half, by + ux * half));
+        ctx.LineTo(new Point(bx + uy * half, by - ux * half));
+        ctx.EndFigure(true);
+        return head;
+    }
+
+    private static (double X, double Y) Direction(PointD from, PointD to)
+    {
+        var length = Math.Max(0.0001, Distance(from, to));
+        return ((to.X - from.X) / length, (to.Y - from.Y) / length);
+    }
+
+    private static double Distance(PointD a, PointD b) => Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y));
+
+    private static Point ToPoint(PointD p) => new(p.X, p.Y);
 
     private static void RenderText(DrawingContext dc, TextAnnotation text)
     {
@@ -174,7 +279,100 @@ internal static class AnnotationRenderer
         return geometry;
     }
 
+    private static void RenderFreehand(DrawingContext dc, FreehandAnnotation stroke)
+    {
+        if (stroke.Points.Count == 0) return;
+        var geometry = SmoothPath(stroke.Points);
+        var width = stroke.StrokeWidth;
+        switch (stroke.Pen)
+        {
+            case PenType.Highlighter:
+                // One stroked path with a translucent brush: self-overlaps don't get darker.
+                dc.DrawGeometry(null, new Pen(new SolidColorBrush(ToColor(stroke.Color.WithAlpha(0x70))), width,
+                    lineCap: PenLineCap.Square, lineJoin: PenLineJoin.Round), geometry);
+                break;
+            case PenType.Outline:
+                var rim = stroke.Color.Luminance > 0.6 ? Colors.Black : Colors.White;
+                dc.DrawGeometry(null, new Pen(new SolidColorBrush(rim), width * 1.8, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), geometry);
+                dc.DrawGeometry(null, CreatePen(stroke.Color, width), geometry);
+                break;
+            default:
+                dc.DrawGeometry(null, CreatePen(stroke.Color, width), geometry);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Smooths a pointer trace with quadratic curves through the midpoints of consecutive
+    /// points, so strokes look drawn rather than jagged. A single point becomes a dot.
+    /// </summary>
+    private static StreamGeometry SmoothPath(IReadOnlyList<PointD> points)
+    {
+        var geometry = new StreamGeometry();
+        using var ctx = geometry.Open();
+        var first = new Point(points[0].X, points[0].Y);
+        ctx.BeginFigure(first, false);
+        if (points.Count == 1)
+        {
+            ctx.LineTo(first + new Vector(0.01, 0)); // zero-length line: drawn as a dot by the round cap
+        }
+        else if (points.Count == 2)
+        {
+            ctx.LineTo(new Point(points[1].X, points[1].Y));
+        }
+        else
+        {
+            for (var i = 1; i < points.Count - 1; i++)
+            {
+                var control = new Point(points[i].X, points[i].Y);
+                var mid = new Point((points[i].X + points[i + 1].X) / 2, (points[i].Y + points[i + 1].Y) / 2);
+                ctx.QuadraticBezierTo(control, mid);
+            }
+            ctx.LineTo(new Point(points[^1].X, points[^1].Y));
+        }
+        ctx.EndFigure(false);
+        return geometry;
+    }
+
     private static readonly ConditionalWeakTable<PixelBuffer, Bitmap> ImageCache = new();
+
+    /// <summary>
+    /// Marked spot (oval in the annotation color), two connecting lines and the round lens
+    /// showing the spot enlarged, with a rim and soft shadow.
+    /// </summary>
+    private static void RenderMagnifier(DrawingContext dc, MagnifierAnnotation lens, PixelBuffer source)
+    {
+        var spot = ToRect(lens.Source);
+        if (spot.Width < 1 || spot.Height < 1) return;
+        var outline = CreatePen(lens.Color, lens.StrokeWidth);
+        dc.DrawEllipse(null, outline, spot.Center, spot.Width / 2, spot.Height / 2);
+
+        var view = ToRect(lens.Lens);
+        if (view.Width < 2 || view.Height < 2) return;
+
+        // Connectors between the outer edges of both ellipses, perpendicular to the line joining them.
+        var (ux, uy) = Direction(new PointD(spot.Center.X, spot.Center.Y), new PointD(view.Center.X, view.Center.Y));
+        var thin = new Pen(new SolidColorBrush(ToColor(lens.Color)), Math.Max(1, lens.StrokeWidth * 0.6), lineCap: PenLineCap.Round);
+        foreach (var side in new[] { 1.0, -1.0 })
+        {
+            var a = new Point(spot.Center.X - uy * side * spot.Width / 2, spot.Center.Y + ux * side * spot.Height / 2);
+            var b = new Point(view.Center.X - uy * side * view.Width / 2, view.Center.Y + ux * side * view.Height / 2);
+            dc.DrawLine(thin, a, b);
+        }
+
+        var rim = Math.Max(2, Math.Min(view.Width, view.Height) * 0.025);
+        dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x40, 0, 0, 0)), null, view.Center + new Vector(0, rim), view.Width / 2 + rim, view.Height / 2 + rim);
+        using (dc.PushGeometryClip(new EllipseGeometry(view)))
+        {
+            var bitmap = ImageCache.GetValue(source, b => b.ToBitmap());
+            var interpolation = lens.Zoom >= 3 ? BitmapInterpolationMode.None : BitmapInterpolationMode.HighQuality;
+            dc.FillRectangle(Brushes.White, view);
+            using (dc.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = interpolation }))
+                dc.DrawImage(bitmap, spot, view);
+        }
+        dc.DrawEllipse(null, new Pen(Brushes.White, rim * 1.6), view.Center, view.Width / 2, view.Height / 2);
+        dc.DrawEllipse(null, outline, view.Center, view.Width / 2 + rim, view.Height / 2 + rim);
+    }
 
     private static void RenderImage(DrawingContext dc, ImageAnnotation image)
     {

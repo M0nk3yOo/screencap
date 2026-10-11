@@ -34,6 +34,8 @@ internal sealed class AnnotationCanvas : Control
     private PointD _lastPoint;
     private bool _moving;
     private bool _moveRecorded;
+    /// <summary>Which part of a magnifier is being dragged: lens, spot, or both (null).</summary>
+    private bool? _movingLens;
     private double _zoom = 1;
     private EditorTool _tool = EditorTool.Arrow;
     private IReadOnlyList<RecognizedLine>? _textRegions;
@@ -118,6 +120,12 @@ internal sealed class AnnotationCanvas : Control
 
     public ObscureStyle ObscureStyle { get; set; } = ObscureStyle.Pixelate;
 
+    public PenType PenType { get; set; } = PenType.Pen;
+
+    public double MagnifierZoom { get; set; } = ToolSizes.DefaultZoom;
+
+    public ArrowStyle ArrowStyle { get; set; } = ArrowStyle.Standard;
+
     public Annotation? Selected { get; private set; }
 
     /// <summary>Text currently open in the inline editor; hidden from rendering meanwhile.</summary>
@@ -192,7 +200,7 @@ internal sealed class AnnotationCanvas : Control
     /// <summary>Recolors the selected annotation, so picking a swatch also edits the selection.</summary>
     public void ApplyColorToSelection()
     {
-        if (Selected is null || Selected is PixelateAnnotation or SpotlightAnnotation or ImageAnnotation) return;
+        if (Selected is null || Selected is PixelateAnnotation or SpotlightAnnotation or ImageAnnotation or MagnifierAnnotation) return;
         _capture.Annotations.BeginChange();
         Selected.Color = Color;
         _capture.Annotations.NotifyChanged();
@@ -224,7 +232,10 @@ internal sealed class AnnotationCanvas : Control
             case CounterAnnotation c:
                 c.Radius = ToolSizes.CounterRadiusFor(StrokePoints) * scaling;
                 break;
-            case ArrowAnnotation or RectangleAnnotation or EllipseAnnotation:
+            case MagnifierAnnotation lens:
+                lens.SetZoom(MagnifierZoom);
+                break;
+            case ArrowAnnotation or RectangleAnnotation or EllipseAnnotation or FreehandAnnotation:
                 target.StrokeWidth = StrokePoints * scaling;
                 break;
             default:
@@ -340,6 +351,16 @@ internal sealed class AnnotationCanvas : Control
             case ArrowAnnotation arrow:
                 yield return ("start", arrow.Start);
                 yield return ("end", arrow.End);
+                if (arrow.IsCurved) yield return ("bend", arrow.PointAt(0.5));
+                break;
+            case MagnifierAnnotation lens:
+                foreach (var (prefix, part) in new[] { ("s", lens.Source), ("l", lens.Lens) })
+                {
+                    yield return ($"{prefix}-nw", new PointD(part.X, part.Y));
+                    yield return ($"{prefix}-ne", new PointD(part.Right, part.Y));
+                    yield return ($"{prefix}-se", new PointD(part.Right, part.Bottom));
+                    yield return ($"{prefix}-sw", new PointD(part.X, part.Bottom));
+                }
                 break;
             case CounterAnnotation counter:
                 // Dragging this pulls out (or moves) the pointer tail.
@@ -375,7 +396,7 @@ internal sealed class AnnotationCanvas : Control
         return null;
     }
 
-    private static StandardCursorType HandleCursor(string id) => id switch
+    private static StandardCursorType HandleCursor(string id) => (id.Length > 2 && id[1] == '-' ? id[2..] : id) switch
     {
         "n" or "s" => StandardCursorType.SizeNorthSouth,
         "e" or "w" => StandardCursorType.SizeWestEast,
@@ -386,15 +407,50 @@ internal sealed class AnnotationCanvas : Control
         _ => StandardCursorType.Hand,
     };
 
+    /// <summary>Where the bend point goes when an end point of a curved arrow moves.</summary>
+    private static PointD BendRelative(ArrowAnnotation before, ArrowAnnotation after)
+    {
+        var mid = before.PointAt(0.5);
+        var baseMid = new PointD((before.Start.X + before.End.X) / 2, (before.Start.Y + before.End.Y) / 2);
+        var newBase = new PointD((after.Start.X + after.End.X) / 2, (after.Start.Y + after.End.Y) / 2);
+        return new PointD(newBase.X + mid.X - baseMid.X, newBase.Y + mid.Y - baseMid.Y);
+    }
+
     /// <summary>Applies a handle drag, always relative to the state at drag start.</summary>
     private void DragHandle(Annotation target, Annotation original, string id, PointD p, bool shift)
     {
         switch (target, original)
         {
-            case (ArrowAnnotation arrow, ArrowAnnotation _):
+            case (ArrowAnnotation arrow, ArrowAnnotation startArrow):
+                if (id == "bend")
+                {
+                    arrow.BendThrough(p);
+                    break;
+                }
                 if (id == "start") arrow.Start = shift ? SnapAngle(arrow.End, p) : p;
                 else arrow.End = shift ? SnapAngle(arrow.Start, p) : p;
+                // Keep the bend's shape relative to the moved end points.
+                if (startArrow.IsCurved) arrow.BendThrough(BendRelative(startArrow, arrow));
                 break;
+            case (MagnifierAnnotation lens, MagnifierAnnotation startLens):
+            {
+                var corner = id[2..];
+                var part = id[0] == 's' ? startLens.Source : startLens.Lens;
+                double l = part.X, t = part.Y, rt = part.Right, bt = part.Bottom;
+                if (corner.Contains('w')) l = p.X; else rt = p.X;
+                if (corner.Contains('n')) t = p.Y; else bt = p.Y;
+                if (id[0] == 'l' && startLens.Source.Height > 0)
+                {
+                    // The lens keeps the spot's proportions, so the enlargement isn't distorted.
+                    var ratio = startLens.Source.Width / startLens.Source.Height;
+                    var height = Math.Abs(rt - l) / ratio;
+                    if (corner.Contains('n')) t = bt - height; else bt = t + height;
+                }
+                var resized = RectD.FromPoints(new PointD(l, t), new PointD(rt, bt));
+                if (id[0] == 's') lens.Source = resized;
+                else lens.Lens = resized;
+                break;
+            }
             case (CounterAnnotation counter, _):
                 counter.Tail = shift ? SnapAngle(counter.Center, p) : p;
                 break;
@@ -567,6 +623,7 @@ internal sealed class AnnotationCanvas : Control
                 if (hit is not null)
                 {
                     AnnotationClicked?.Invoke();
+                    _movingLens = hit is MagnifierAnnotation m ? m.HitLens(p, hitTolerance) : null;
                     _moving = true;
                     _moveRecorded = false;
                     e.Pointer.Capture(this);
@@ -607,6 +664,20 @@ internal sealed class AnnotationCanvas : Control
 
             case EditorTool.ColorPicker:
                 ColorPicked?.Invoke(_capture.Image.GetPixel((int)p.X, (int)p.Y));
+                return;
+
+            case EditorTool.Freehand:
+                Select(null);
+                EditingStarted?.Invoke();
+                _draft = new FreehandAnnotation
+                {
+                    Points = [p],
+                    Pen = PenType,
+                    Color = Color,
+                    StrokeWidth = StrokePoints * scaling,
+                };
+                e.Pointer.Capture(this);
+                InvalidateVisual();
                 return;
 
             case EditorTool.TextRecognition:
@@ -702,7 +773,17 @@ internal sealed class AnnotationCanvas : Control
                 EditingStarted?.Invoke();
                 BeginGrowingDrag();
             }
-            Selected.Move((screen.X - _lastScreen.X) / DisplayScale, (screen.Y - _lastScreen.Y) / DisplayScale);
+            var dx = (screen.X - _lastScreen.X) / DisplayScale;
+            var dy = (screen.Y - _lastScreen.Y) / DisplayScale;
+            if (Selected is MagnifierAnnotation magnifier && _movingLens is { } lensPart)
+            {
+                if (lensPart) magnifier.MoveLens(dx, dy);
+                else magnifier.MoveSource(dx, dy);
+            }
+            else
+            {
+                Selected.Move(dx, dy);
+            }
             _capture.Annotations.NotifyChanged();
             ReportViewShift();
         }
@@ -784,7 +865,9 @@ internal sealed class AnnotationCanvas : Control
             Select(pixelate);
             return;
         }
-        if (draft is CounterAnnotation || b.Width >= MinShapeSize || b.Height >= MinShapeSize)
+        if (draft is MagnifierAnnotation newLens && newLens.Source.Width >= MinShapeSize && newLens.Source.Height >= MinShapeSize)
+            newLens.PlaceLens(MagnifierZoom, _capture.Image.Width);
+        if (draft is CounterAnnotation or FreehandAnnotation || b.Width >= MinShapeSize || b.Height >= MinShapeSize)
         {
             _capture.Annotations.Add(draft);
             // The new annotation stays selected: its options and handles can be used right away.
@@ -806,7 +889,7 @@ internal sealed class AnnotationCanvas : Control
         var rect = new RectD(p.X, p.Y, 0, 0);
         return Tool switch
         {
-            EditorTool.Arrow => new ArrowAnnotation { Start = p, End = p, Color = Color, StrokeWidth = stroke },
+            EditorTool.Arrow => new ArrowAnnotation { Start = p, End = p, Color = Color, StrokeWidth = stroke, Style = ArrowStyle },
             EditorTool.Rectangle => new RectangleAnnotation { Rect = rect, Color = Color, StrokeWidth = stroke },
             EditorTool.Ellipse => new EllipseAnnotation { Rect = rect, Color = Color, StrokeWidth = stroke },
             EditorTool.Highlight => new HighlightAnnotation { Rect = rect, Color = Color, StrokeWidth = 0 },
@@ -819,6 +902,7 @@ internal sealed class AnnotationCanvas : Control
                 StrokeWidth = 0,
             },
             EditorTool.Spotlight => new SpotlightAnnotation { Rect = rect, StrokeWidth = 0 },
+            EditorTool.Magnifier => new MagnifierAnnotation { Source = rect, Color = Color, StrokeWidth = stroke },
             _ => throw new InvalidOperationException($"{Tool} does not draw shapes"),
         };
     }
@@ -829,9 +913,32 @@ internal sealed class AnnotationCanvas : Control
         {
             case ArrowAnnotation arrow:
                 arrow.End = constrain ? SnapAngle(arrow.Start, p) : p;
+                if (arrow.Style == ArrowStyle.Curved) arrow.ApplyDefaultBend();
                 break;
             case CounterAnnotation counter:
                 counter.Tail = constrain ? SnapAngle(counter.Center, p) : p;
+                break;
+            case FreehandAnnotation stroke:
+                if (constrain)
+                {
+                    // Shift: a straight line from the starting point (45° steps).
+                    stroke.Points = [stroke.Points[0], SnapAngle(stroke.Points[0], p)];
+                    break;
+                }
+                // Skip points closer than ~1.5 screen pixels: smoother curves, smaller files.
+                var last = stroke.Points[^1];
+                var minDistance = 1.5 / DisplayScale;
+                if (Math.Abs(p.X - last.X) + Math.Abs(p.Y - last.Y) >= minDistance)
+                    stroke.Points = [.. stroke.Points, p];
+                break;
+            case MagnifierAnnotation lens:
+                // The marked spot is drawn like an ellipse (Shift: circle); the lens follows on release.
+                if (constrain)
+                {
+                    var size = Math.Max(Math.Abs(p.X - _dragStart.X), Math.Abs(p.Y - _dragStart.Y));
+                    p = new PointD(_dragStart.X + Math.Sign(p.X - _dragStart.X) * size, _dragStart.Y + Math.Sign(p.Y - _dragStart.Y) * size);
+                }
+                lens.Source = RectD.FromPoints(_dragStart, p);
                 break;
             case BoxAnnotation box:
                 if (constrain)
