@@ -432,6 +432,7 @@ internal sealed class AppController
     private async Task OnCapturedAsync(Capture capture, PixelRect region, Screen screen)
     {
         LastCapture = capture;
+        AddTabInBackground(capture);
         var preview = new PreviewWindow(this, capture, region, screen);
         _preview = preview;
         preview.Closed += (_, _) =>
@@ -632,12 +633,48 @@ internal sealed class AppController
         pin.Show();
     }
 
+    /// <summary>At most this many untouched screenshots are kept as tabs from captures.</summary>
+    internal const int MaxBackgroundTabs = 30;
+
+    /// <summary>
+    /// True while a capture is being added as a tab without switching to it, so the main
+    /// window keeps the tab the user is working on.
+    /// </summary>
+    internal bool IsAddingTabInBackground { get; private set; }
+
+    /// <summary>
+    /// Every capture also lands in the main window as a tab, so it can be edited later even
+    /// if the user only copied or pinned it. The window itself is not opened.
+    /// </summary>
+    private void AddTabInBackground(Capture capture)
+    {
+        if (Tabs.Contains(capture)) return;
+        IsAddingTabInBackground = _mainWindow is not null;
+        try
+        {
+            Tabs.Add(capture);
+        }
+        finally
+        {
+            IsAddingTabInBackground = false;
+        }
+        // Drop the oldest unedited screenshots so tabs don't pile up forever.
+        while (Tabs.Count > MaxBackgroundTabs &&
+               Tabs.FirstOrDefault(c => c != capture && IsUntouched(c)) is { } oldest)
+            Tabs.Remove(oldest);
+    }
+
+    private static bool IsUntouched(Capture capture) =>
+        capture.Annotations.Items.Count == 0 && capture.Annotations.Crop is null;
+
     public void OpenInEditor(Capture capture)
     {
         if (!Tabs.Contains(capture)) Tabs.Add(capture);
         var window = ShowMainWindow();
         window.SelectTab(capture);
     }
+
+    internal bool IsMainWindowOpen => _mainWindow is not null;
 
     public MainWindow ShowMainWindow()
     {

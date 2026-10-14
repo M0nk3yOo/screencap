@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 – 2026-10-14
+
+- Jeder Screenshot landet automatisch als Reiter im Hauptfenster, auch wenn er nur kopiert oder angepinnt wurde (höchstens 30 unbearbeitete, älteste fallen weg)
+
 ## 1.0.2 – 2026-10-11
 
 - Zuschneiden: Knöpfe „Zuschneiden“, „Abbrechen“ und „Zurücksetzen“ unter dem Werkzeug

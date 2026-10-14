@@ -137,7 +137,7 @@ Es können beliebig viele Pins gleichzeitig offen sein. Auf dem Mac sind Pins au
 
 ## 6. Der Editor
 
-Jeder Screenshot bekommt einen **Reiter** in der Titelzeile.
+Jeder Screenshot bekommt einen **Reiter** in der Titelzeile. Das gilt auch, wenn du ihn in der Vorschau oder im Pin nur kopiert, gespeichert oder angepinnt hast – so kannst du ihn später jederzeit noch bearbeiten. Die Aufnahme öffnet das Hauptfenster dabei nicht; ist es schon offen, bleibt der aktuelle Reiter ausgewählt. Von unbearbeiteten Screenshots werden höchstens 30 behalten, die ältesten fallen weg.
 
 - **Reiter wechseln**: anklicken oder Strg+Tab / Strg+Umschalt+Tab
 - **Reiter verschieben**: per Drag & Drop nach links/rechts

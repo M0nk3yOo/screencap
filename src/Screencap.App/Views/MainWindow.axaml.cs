@@ -127,7 +127,10 @@ public partial class MainWindow : Window
         foreach (Capture capture in e.OldItems ?? Array.Empty<Capture>())
             if (_tabs.FirstOrDefault(t => t.Capture == capture) is { } tab) RemoveTab(tab);
         foreach (Capture capture in e.NewItems ?? Array.Empty<Capture>())
-            Select(AddTab(capture));
+        {
+            var tab = AddTab(capture);
+            if (!_app.IsAddingTabInBackground || _selected is null) Select(tab);
+        }
         UpdateEmptyState();
     }
 
