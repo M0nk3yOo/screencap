@@ -28,7 +28,7 @@ internal static partial class ObjC
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
     public static partial void SendVoidRectBool(IntPtr receiver, IntPtr selector, CGRect rect, [MarshalAs(UnmanagedType.U1)] bool arg);
 
-    /// <summary>For methods returning NSPoint/CGPoint (two doubles, returned in registers on arm64 and x64).</summary>
+    /// <summary>For methods returning NSPoint/CGPoint (two doubles, returned in registers on arm64).</summary>
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
     public static partial CGPoint SendPoint(IntPtr receiver, IntPtr selector);
 
@@ -87,21 +87,12 @@ internal static partial class ObjC
     [return: MarshalAs(UnmanagedType.U1)]
     public static partial bool SendBoolPtrOut(IntPtr receiver, IntPtr selector, IntPtr arg, out IntPtr error);
 
-    /// <summary>CGRect-returning methods on arm64 (returned in registers).</summary>
+    /// <summary>CGRect-returning methods (arm64 returns them in registers).</summary>
     [LibraryImport(Lib, EntryPoint = "objc_msgSend")]
-    private static partial CGRect SendRectArm64(IntPtr receiver, IntPtr selector);
+    private static partial CGRect SendRectRaw(IntPtr receiver, IntPtr selector);
 
-    /// <summary>CGRect-returning methods on x86_64 (large structs come back via hidden pointer).</summary>
-    [LibraryImport(Lib, EntryPoint = "objc_msgSend_stret")]
-    private static partial void SendRectStret(out CGRect result, IntPtr receiver, IntPtr selector);
-
-    public static CGRect SendRect(IntPtr receiver, string selector)
-    {
-        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
-            return SendRectArm64(receiver, sel_registerName(selector));
-        SendRectStret(out var rect, receiver, sel_registerName(selector));
-        return rect;
-    }
+    public static CGRect SendRect(IntPtr receiver, string selector) =>
+        SendRectRaw(receiver, sel_registerName(selector));
 
     [LibraryImport(Lib)]
     public static partial IntPtr objc_autoreleasePoolPush();

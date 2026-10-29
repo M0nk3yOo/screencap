@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Builds Screencap.app for one architecture and packs it into a DMG with an
-# Applications shortcut. Usage: scripts/package-macos.sh [arm64|x86_64]
+# Builds Screencap.app for Apple Silicon and packs it into a DMG with an
+# Applications shortcut. Usage: scripts/package-macos.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ARCH="${1:-$(uname -m)}"
+ARCH=arm64
 VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$ROOT/Directory.Build.props")"
-case "$ARCH" in arm64) LABEL=apple-silicon ;; x86_64) LABEL=intel ;; *) echo "Unknown arch $ARCH" >&2; exit 1 ;; esac
+LABEL=apple-silicon
 
-APP="$("$ROOT/scripts/build-macos-app.sh" "$ARCH" | tail -1)"
+APP="$("$ROOT/scripts/build-macos-app.sh" | tail -1)"
 OUT="$ROOT/artifacts/release"
 STAGE="$ROOT/artifacts/dmg-$ARCH"
 DMG="$OUT/Screencap-$VERSION-macos-$LABEL.dmg"

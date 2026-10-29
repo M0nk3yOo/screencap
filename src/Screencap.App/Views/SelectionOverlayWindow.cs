@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Screencap.App.Controls;
@@ -41,6 +43,20 @@ internal sealed class SelectionOverlayWindow : Window
             .ToList();
         Selector = new RegionSelector(image, pixels, pixels.Width / Width, local);
         Content = Selector;
+
+        // Esc cancels wherever the keyboard focus is; with several overlays only one has it.
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Escape) return;
+            Selector.Cancel();
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        // The pointer is on this screen, so this overlay should get the keys.
+        Selector.PointerEntered += (_, _) =>
+        {
+            Activate();
+            Selector.Focus();
+        };
     }
 
     public Screen Screen { get; }

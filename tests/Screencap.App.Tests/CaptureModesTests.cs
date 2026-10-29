@@ -242,4 +242,24 @@ public sealed class CaptureModesTests : IDisposable
         var onVertical = Enumerable.Range(450, 40).Max(y => (int)frame.GetPixel(300, y).R);
         Assert.True(onVertical > offGuide + 60, $"vertical guide {onVertical} vs background {offGuide}");
     }
+
+    [AvaloniaFact]
+    public void Overlay_EscapeCancels_EvenWithoutFocusOnSelector()
+    {
+        var pixels = new PixelBuffer(400, 300, new byte[400 * 300 * 4]);
+        using var bitmap = pixels.ToBitmap();
+        var screen = new Window().Screens.Primary
+            ?? throw new InvalidOperationException("Headless platform reports no screen");
+        var overlay = new SelectionOverlayWindow(screen, pixels, bitmap, new FakePlatform());
+        _windows.Add(overlay);
+        var cancelled = false;
+        overlay.Selector.Completed += rect => cancelled = rect is null;
+        overlay.Show();
+        Dispatcher.UIThread.RunJobs();
+        overlay.Focus();
+
+        overlay.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+
+        Assert.True(cancelled);
+    }
 }

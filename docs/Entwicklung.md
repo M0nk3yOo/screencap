@@ -68,10 +68,9 @@ dotnet run --project src/Screencap.App -f net10.0-windows10.0.19041.0
 1. Version in `Directory.Build.props` (`<Version>`) erhöhen, `CHANGELOG.md` ergänzen.
 2. macOS-Pakete bauen (auf einem Mac):
    ```sh
-   ./scripts/package-macos.sh arm64
-   ./scripts/package-macos.sh x86_64
+   ./scripts/package-macos.sh
    ```
-   → `artifacts/release/Screencap-<version>-macos-apple-silicon.dmg` und `…-intel.dmg`
+   → `artifacts/release/Screencap-<version>-macos-apple-silicon.dmg` (nur Apple Silicon, keine Intel-Pakete)
 3. Release anlegen und die DMGs anhängen:
    ```sh
    gh release create v<version> artifacts/release/*.dmg --title "Screencap <version>" --notes-file …

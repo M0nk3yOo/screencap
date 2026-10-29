@@ -23,8 +23,7 @@ Fertige Pakete gibt es unter **[Releases](../../releases)**:
 
 | System | Datei |
 |---|---|
-| macOS, Apple Silicon | `Screencap-<version>-macos-apple-silicon.dmg` |
-| macOS, Intel | `Screencap-<version>-macos-intel.dmg` |
+| macOS (Apple Silicon) | `Screencap-<version>-macos-apple-silicon.dmg` |
 | Windows, x64 | `Screencap-<version>-windows-x64.zip` |
 | Windows, ARM64 | `Screencap-<version>-windows-arm64.zip` |
 

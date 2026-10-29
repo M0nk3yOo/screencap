@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 – 2026-10-29
+
+- macOS: nur noch Apple Silicon; die Intel-Pakete (`…-macos-intel.dmg`) entfallen
+- Aufnahme lässt sich mit Esc abbrechen, auch wenn das Auswahl-Overlay noch keinen Tastaturfokus hatte (Windows: Overlay kommt in den Vordergrund; mehrere Monitore: Esc greift auf jedem)
+
 ## 1.0.3 – 2026-10-14
 
 - Jeder Screenshot landet automatisch als Reiter im Hauptfenster, auch wenn er nur kopiert oder angepinnt wurde (höchstens 30 unbearbeitete, älteste fallen weg)

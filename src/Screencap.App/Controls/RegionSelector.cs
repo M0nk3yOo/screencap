@@ -55,6 +55,9 @@ internal sealed class RegionSelector : Control
     /// <summary>Raised with the selected rectangle, or null when cancelled.</summary>
     public event Action<Rect?>? Completed;
 
+    /// <summary>Aborts the selection, as Esc or a right click does.</summary>
+    public void Cancel() => Completed?.Invoke(null);
+
     private Rect? Selection => _dragStart is { } s && _pointer is { } p ? new Rect(s, p).Normalize() : null;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -106,7 +109,7 @@ internal sealed class RegionSelector : Control
     {
         if (e.Key == Key.Escape)
         {
-            Completed?.Invoke(null);
+            Cancel();
             e.Handled = true;
         }
         else if (e.Key is Key.Enter or Key.Space)

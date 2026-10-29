@@ -5,12 +5,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ARCH="${1:-$(uname -m)}"
-case "$ARCH" in
-  arm64) RID=osx-arm64 ;;
-  x86_64) RID=osx-x64 ;;
-  *) echo "Unknown architecture: $ARCH" >&2; exit 1 ;;
-esac
+RID=osx-arm64 # Apple Silicon only; there are no Intel builds.
 
 export PATH="$HOME/.dotnet:$PATH"
 OUT="$ROOT/artifacts/macos"

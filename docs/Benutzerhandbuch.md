@@ -23,9 +23,7 @@ Screencap ist ein Screenshot-Werkzeug für **macOS** und **Windows** nach dem Vo
 
 ### macOS (ab macOS 12)
 
-1. Passende Datei aus dem Release laden:
-   - **Apple Silicon** (M1/M2/M3/M4 …): `Screencap-…-macos-apple-silicon.dmg`
-   - **Intel**: `Screencap-…-macos-intel.dmg`
+1. `Screencap-…-macos-apple-silicon.dmg` aus dem Release laden. Die App läuft nur auf Macs mit Apple-Chip (M1/M2/M3/M4 …); Intel-Macs werden nicht unterstützt.
 2. DMG öffnen und **Screencap** in den Ordner **Programme** ziehen.
 3. **Erster Start:** Die App ist nicht von Apple notariell beglaubigt. macOS blockiert deshalb den ersten Start.
    - Systemeinstellungen → **Datenschutz & Sicherheit** → ganz unten bei „Screencap wurde blockiert“ auf **Dennoch öffnen** klicken, oder
