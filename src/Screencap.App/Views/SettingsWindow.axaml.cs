@@ -51,6 +51,23 @@ public partial class SettingsWindow : Window
             }
         };
 
+        UpdatePanel.IsVisible = app.Updates.CanInstall;
+        AutoUpdate.IsChecked = settings.CheckForUpdates;
+        VersionText.Text = $"Installierte Version: {Screencap.Core.Updates.UpdateChecker.CurrentVersion.ToString(3)}";
+        AutoUpdate.IsCheckedChanged += (_, _) => Update(s => s.CheckForUpdates = AutoUpdate.IsChecked == true);
+        CheckNow.Click += async (_, _) =>
+        {
+            CheckNow.IsEnabled = false;
+            try
+            {
+                await app.CheckForUpdatesAsync(userInitiated: true);
+            }
+            finally
+            {
+                CheckNow.IsEnabled = true;
+            }
+        };
+
         ThemeMode.SelectedIndex = (int)settings.Theme;
         ThemeMode.SelectionChanged += (_, _) =>
         {

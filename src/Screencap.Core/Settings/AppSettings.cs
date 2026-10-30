@@ -19,6 +19,15 @@ public sealed class AppSettings
     /// <summary>Reopen the editor tabs of the last session on startup.</summary>
     public bool RestoreTabsOnStartup { get; set; }
 
+    /// <summary>Set while the app restarts for an update, so open screenshots survive it. Cleared on start.</summary>
+    public bool RestoreTabsOnce { get; set; }
+
+    /// <summary>Look for a newer release on GitHub at startup and once a day.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>A release the user chose to ignore; only a newer one is announced again.</summary>
+    public string SkippedUpdateVersion { get; set; } = "";
+
     /// <summary>Put every new screenshot on the clipboard right away.</summary>
     public bool CopyToClipboardAfterCapture { get; set; }
 

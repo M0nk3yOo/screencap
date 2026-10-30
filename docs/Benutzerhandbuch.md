@@ -262,6 +262,7 @@ Menü des Symbols → **Einstellungen …** (oder das Zahnrad im Editor). Die Ei
 
 **Allgemein**
 - Beim Anmelden automatisch starten
+- **Updates**: Automatisch nach Updates suchen (Standard: an) und *Jetzt suchen*. Siehe [Updates](#updates)
 
 **Nach der Aufnahme**
 - Automatisch in die Zwischenablage kopieren
@@ -284,6 +285,21 @@ Menü des Symbols → **Einstellungen …** (oder das Zahnrad im Editor). Die Ei
 
 **Tastenkürzel**
 - Auf ein Kürzel klicken und die neue Kombination drücken (Esc bricht ab). *Standard wiederherstellen* setzt alle zurück. Ist eine Kombination schon belegt, erscheint ein Hinweis.
+
+### Updates
+
+Screencap fragt wenige Sekunden nach dem Start und danach einmal täglich bei GitHub nach einer neueren Version (nur diese Abfrage, es werden keine Nutzerdaten gesendet). Gibt es eine, erscheint ein Fenster mit den Versionshinweisen:
+
+![Update-Hinweis](images/update.png)
+
+- **Jetzt aktualisieren** lädt das Paket, prüft die Prüfsumme und ersetzt die App. Screencap startet danach neu; offene Screenshots samt Markierungen bleiben erhalten.
+- **Später** fragt beim nächsten Check wieder, **Version überspringen** meldet diese Version nicht mehr, erst eine noch neuere.
+- Manuell: Menü des Symbols → **Nach Updates suchen …** oder *Einstellungen → Allgemein → Jetzt suchen*. Steht eine Version bereit, zeigt das Menü *Version x installieren …*.
+- Die automatische Suche lässt sich in den Einstellungen abschalten.
+
+Voraussetzungen: Die App muss in einem Ordner liegen, in den du schreiben darfst (macOS: z. B. *Programme*; Windows: nicht unter *Programme*, sondern z. B. im Benutzerordner). Beim Start aus der Entwicklungsumgebung gibt es keine Updates. Scheitert die Installation, nennt das Fenster den Grund und den Download-Link.
+
+Unter macOS hängt die Berechtigung *Bildschirmaufnahme* an der Signatur der App. Nach einem Update kann macOS sie erneut abfragen; dann Screencap in den Systemeinstellungen noch einmal erlauben.
 
 ---
 

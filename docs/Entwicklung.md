@@ -63,6 +63,33 @@ Per `dotnet run` gestartet, gilt die Bildschirmaufnahme-Berechtigung des Termina
 dotnet run --project src/Screencap.App -f net10.0-windows10.0.19041.0
 ```
 
+## Updates
+
+`Screencap.Core/Updates` fragt `releases/latest` der GitHub-API ab (öffentliches Repository, ohne Anmeldung) und wählt das Paket nach dem **Dateinamen**:
+
+| System | Datei |
+|---|---|
+| macOS (Apple Silicon) | `Screencap-<version>-macos-apple-silicon.dmg` |
+| Windows x64 / ARM64 | `Screencap-<version>-windows-x64.zip` / `…-windows-arm64.zip` |
+
+Diese Namen nicht ändern, sonst findet die App ihr Update nicht mehr. Außerdem:
+
+- Es werden nur Downloads von `https://github.com/M0nk3yOo/screencap/releases/download/` akzeptiert; Größe und SHA-256 (`digest` der GitHub-API) werden geprüft.
+- Ein Release wird erst angeboten, wenn das Paket für das jeweilige System angehängt ist (die Windows-Pakete kommen einige Minuten nach dem Veröffentlichen aus dem Workflow).
+- **Windows**: die laufende `Screencap.exe` wird in `Screencap.exe.old` umbenannt, die neue kommt an ihre Stelle, PowerShell startet sie nach zwei Sekunden; `.old` wird beim nächsten Start gelöscht.
+- **macOS**: das DMG wird eingehängt, `Screencap.app` per `ditto` neben die installierte App kopiert, `codesign --verify` geprüft; ein abgelöstes Shell-Skript wartet auf das Ende des Prozesses, tauscht die Ordner und öffnet die App. Für die Bildschirmaufnahme-Berechtigung sollten alle Releases mit derselben Signatur-Identität gebaut werden (`scripts/create-dev-certificate.sh`).
+- Vor dem Neustart setzt die App `RestoreTabsOnce`, damit offene Screenshots wiederkommen.
+
+## Screenshots für die GitHub-Seite
+
+Die Bilder in `docs/images` entstehen aus den echten Fenstern mit erfundenen Beispieldaten (`tests/Screencap.App.Tests/ScreenshotGallery.cs`). Nach Änderungen an der Oberfläche neu erzeugen:
+
+```sh
+SCREENCAP_SCREENSHOTS=$PWD/docs/images dotnet test tests/Screencap.App.Tests --filter ScreenshotGallery
+```
+
+Ohne die Variable tun die Tests nichts. Der Glas-Effekt ist in der headless Darstellung nicht sichtbar.
+
 ## Release erstellen
 
 1. Version in `Directory.Build.props` (`<Version>`) erhöhen, `CHANGELOG.md` ergänzen.

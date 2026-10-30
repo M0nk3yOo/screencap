@@ -11,6 +11,10 @@ internal static class TrayMenu
 {
     public static TrayIcon Create(AppController app)
     {
+        var updateItem = Item("Nach Updates suchen …", () => _ = ShowUpdatesAsync(app));
+        if (!app.Updates.CanInstall) updateItem.IsVisible = false;
+        app.Updates.AvailableChanged += () =>
+            updateItem.Header = app.Updates.Available is { } r ? $"Version {r.Version.ToString(3)} installieren …" : "Nach Updates suchen …";
         var menu = new NativeMenu
         {
             Item("Bereich aufnehmen", () => _ = app.CaptureRegionAsync(), app.Settings.RegionHotkey),
@@ -20,6 +24,7 @@ internal static class TrayMenu
             new NativeMenuItemSeparator(),
             Item("Hauptfenster öffnen", () => app.ShowMainWindow()),
             Item("Einstellungen …", app.ShowSettings),
+            updateItem,
             new NativeMenuItemSeparator(),
             Item("Screencap beenden", app.Quit),
         };
@@ -35,6 +40,12 @@ internal static class TrayMenu
         tray.Clicked += (_, _) => app.ShowMainWindow();
         TrayIcon.SetIcons(Application.Current!, [tray]);
         return tray;
+    }
+
+    private static async Task ShowUpdatesAsync(AppController app)
+    {
+        if (app.Updates.Available is { } release) app.ShowUpdateWindow(release);
+        else await app.CheckForUpdatesAsync(userInitiated: true);
     }
 
     private static NativeMenuItem Item(string header, Action action, Hotkey? hotkey = null)

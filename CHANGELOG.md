@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.5 – 2026-10-30
+
+- Updates: Screencap sucht beim Start und täglich bei GitHub nach einer neuen Version und installiert sie auf Wunsch (macOS und Windows); abschaltbar, manuell über Menü und Einstellungen
+- README mit Beispielbildern; Lizenz GPL-3.0
+- Das Projekt ist jetzt öffentlich auf GitHub
+
 ## 1.0.4 – 2026-10-29
 
 - macOS: nur noch Apple Silicon; die Intel-Pakete (`…-macos-intel.dmg`) entfallen

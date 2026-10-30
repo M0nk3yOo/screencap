@@ -17,6 +17,7 @@ using Screencap.Core.Ocr;
 using Screencap.Core.Platform;
 using Screencap.Core.Session;
 using Screencap.Core.Settings;
+using Screencap.Core.Updates;
 
 namespace Screencap.App.Services;
 
@@ -41,6 +42,9 @@ internal sealed class AppController
     private readonly List<PinWindow> _pins = [];
     private DispatcherTimer? _cleanupTimer;
     private bool _capturing;
+    private DispatcherTimer? _updateTimer;
+    private UpdateWindow? _updateWindow;
+    private string? _announcedUpdate;
 
     /// <param name="dataDirectory">Where settings and session live; tests pass a temp folder.</param>
     public AppController(IClassicDesktopStyleApplicationLifetime desktop, IPlatformServices platform,
@@ -52,6 +56,7 @@ internal sealed class AppController
         _settingsStore = new SettingsStore(Path.Combine(dataDirectory, AppPaths.SettingsFileName));
         _sessionStore = new SessionStore(Path.Combine(dataDirectory, AppPaths.SessionDirectoryName));
         Settings = _settingsStore.Load();
+        Updates = UpdateService.CreateDefault();
         _sessionSaveTimer = new DispatcherTimer(TimeSpan.FromSeconds(1.5), DispatcherPriority.Background, (_, _) => SaveSession());
         Tabs.CollectionChanged += (_, e) =>
         {
@@ -63,6 +68,9 @@ internal sealed class AppController
 
     public AppSettings Settings { get; }
 
+    /// <summary>Replaceable so tests don't talk to GitHub.</summary>
+    internal UpdateService Updates { get; set; }
+
     /// <summary>Screenshots open in the main window, in tab order.</summary>
     public ObservableCollection<Capture> Tabs { get; } = [];
 
@@ -72,7 +80,14 @@ internal sealed class AppController
 
     public void Start()
     {
-        if (Settings.RestoreTabsOnStartup)
+        var restoreTabs = Settings.RestoreTabsOnStartup || Settings.RestoreTabsOnce;
+        if (Settings.RestoreTabsOnce)
+        {
+            // The one-time restore for an update restart is used up.
+            Settings.RestoreTabsOnce = false;
+            _settingsStore.Save(Settings);
+        }
+        if (restoreTabs)
         {
             try
             {
@@ -89,6 +104,9 @@ internal sealed class AppController
         RegisterHotkeys();
         ApplyAutostartDefault();
 
+        Updates.CleanUpAfterUpdate();
+        StartUpdateChecks();
+
         CleanUpOldScreenshots();
         _cleanupTimer = new DispatcherTimer(TimeSpan.FromHours(6), DispatcherPriority.Background, (_, _) => CleanUpOldScreenshots());
         _cleanupTimer.Start();
@@ -98,6 +116,7 @@ internal sealed class AppController
     {
         _sessionSaveTimer.Stop();
         _cleanupTimer?.Stop();
+        _updateTimer?.Stop();
         if (_settingsSaveTimer?.IsEnabled == true) _settingsStore.Save(Settings);
         SaveSession();
         _platform.Hotkeys.Dispose();
@@ -686,7 +705,7 @@ internal sealed class AppController
                 _mainWindow = null;
                 _platform.Windows.SetDockIconVisible(false);
                 // Without session restore, closing the window discards its tabs.
-                if (!Settings.RestoreTabsOnStartup) Tabs.Clear();
+                if (!Settings.RestoreTabsOnStartup && !Settings.RestoreTabsOnce) Tabs.Clear();
             };
             _mainWindow.Show();
             // While the editor is open, Screencap shows up in the Dock and the app switcher.
@@ -707,6 +726,81 @@ internal sealed class AppController
         }
         _platform.Windows.ActivateApplication();
         _settingsWindow.Activate();
+    }
+
+    // ---------------------------------------------------------------- updates
+
+    /// <summary>First check shortly after the start, then daily. Development builds never check.</summary>
+    private void StartUpdateChecks()
+    {
+        if (!Updates.CanInstall) return;
+        _updateTimer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, async (_, _) =>
+        {
+            _updateTimer!.Interval = TimeSpan.FromHours(24);
+            if (Settings.CheckForUpdates) await CheckForUpdatesAsync(userInitiated: false);
+        });
+        _updateTimer.Start();
+    }
+
+    /// <summary>
+    /// Asks GitHub for a newer release. Automatic checks stay silent unless there is news (and
+    /// the version wasn't skipped); a manual check always answers.
+    /// </summary>
+    public async Task CheckForUpdatesAsync(bool userInitiated)
+    {
+        var result = await Updates.CheckAsync();
+        if (result == UpdateCheckResult.Available)
+        {
+            var release = Updates.Available!;
+            var version = release.Version.ToString(3);
+            if (userInitiated || (Settings.SkippedUpdateVersion != version && _announcedUpdate != version))
+            {
+                _announcedUpdate = version;
+                ShowUpdateWindow(release);
+            }
+        }
+        else if (userInitiated)
+        {
+            var message = result == UpdateCheckResult.UpToDate
+                ? $"Du verwendest die neueste Version ({UpdateChecker.CurrentVersion.ToString(3)})."
+                : $"Die Suche nach Updates ist fehlgeschlagen: {Updates.LastError}";
+            await MessageDialog.ShowAsync("Updates", message, "OK");
+        }
+    }
+
+    internal bool IsUpdateWindowOpen => _updateWindow is not null;
+
+    public void ShowUpdateWindow(ReleaseInfo release)
+    {
+        if (_updateWindow is null)
+        {
+            _updateWindow = new UpdateWindow(this, release);
+            _updateWindow.Closed += (_, _) => _updateWindow = null;
+            _updateWindow.Show();
+        }
+        _platform.Windows.ActivateApplication();
+        _updateWindow.Activate();
+    }
+
+    /// <summary>Downloads and installs the available update, then restarts the app.</summary>
+    public async Task InstallUpdateAsync(IProgress<double>? progress, Action onRestarting, CancellationToken cancellationToken)
+    {
+        var relaunch = await Updates.PrepareAsync(progress, cancellationToken);
+        onRestarting();
+        // Open screenshots come back after the restart, whatever the tab setting says.
+        Settings.RestoreTabsOnce = true;
+        _settingsStore.Save(Settings);
+        try
+        {
+            relaunch();
+        }
+        catch
+        {
+            Settings.RestoreTabsOnce = false;
+            _settingsStore.Save(Settings);
+            throw;
+        }
+        Quit();
     }
 
     public void CloseTab(Capture capture) => Tabs.Remove(capture);
@@ -743,7 +837,7 @@ internal sealed class AppController
         _sessionSaveTimer.Stop();
         try
         {
-            if (Settings.RestoreTabsOnStartup) _sessionStore.Save(Tabs);
+            if (Settings.RestoreTabsOnStartup || Settings.RestoreTabsOnce) _sessionStore.Save(Tabs);
             else _sessionStore.Clear();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

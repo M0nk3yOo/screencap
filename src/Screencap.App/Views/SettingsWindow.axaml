@@ -48,6 +48,14 @@
             <TextBlock x:Name="AutostartHint" Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0" IsVisible="False"
                        Text="Nur in der installierten App verfügbar (nicht beim Start aus der Entwicklungsumgebung)." />
           </StackPanel>
+          <StackPanel x:Name="UpdatePanel" Spacing="8">
+            <TextBlock Text="Updates" FontWeight="SemiBold" FontSize="15" />
+            <CheckBox x:Name="AutoUpdate" Content="Automatisch nach Updates suchen" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Button x:Name="CheckNow" Content="Jetzt suchen" />
+              <TextBlock x:Name="VersionText" VerticalAlignment="Center" Opacity="0.6" />
+            </StackPanel>
+          </StackPanel>
           <StackPanel Spacing="8">
             <TextBlock Text="Nach der Aufnahme" FontWeight="SemiBold" FontSize="15" />
             <CheckBox x:Name="CopyAfterCapture" Content="Automatisch in die Zwischenablage kopieren" />
