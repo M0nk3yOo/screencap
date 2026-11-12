@@ -114,6 +114,8 @@ Erscheint nach jeder Aufnahme neben dem aufgenommenen Bereich.
 
 Das Fenster lässt sich am Bild verschieben.
 
+Solange du nichts tust, schließt sich die Vorschau nach **5 Sekunden** von selbst; ein Ring um den Schließen-Knopf zeigt die verbleibende Zeit. Sobald du einen Knopf oder eine Taste drückst oder das Bild anfasst, bleibt sie offen. Zeit und Abschalten: *Einstellungen → Allgemein → Nach der Aufnahme*.
+
 ---
 
 ## 5. Anpinnen
@@ -267,6 +269,7 @@ Menü des Symbols → **Einstellungen …** (oder das Zahnrad im Editor). Die Ei
 **Nach der Aufnahme**
 - Automatisch in die Zwischenablage kopieren
 - Jeden Screenshot automatisch im Speicherort sichern
+- Vorschau automatisch schließen nach … Sekunden (Standard: an, 5 Sekunden)
 - Reiter beim nächsten Start wiederherstellen (inklusive aller Markierungen)
 
 **Speicherort**

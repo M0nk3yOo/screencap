@@ -36,7 +36,15 @@
           <Button x:Name="SaveButton" Classes="tool"><PathIcon Data="{StaticResource IconSave}" Width="15" Height="15" /></Button>
           <Button x:Name="OcrButton" Classes="tool"><PathIcon Data="{StaticResource IconOcr}" Width="15" Height="15" /></Button>
           <Button x:Name="PinButton" Classes="tool" ToolTip.Tip="Anpinnen (P)"><PathIcon Data="{StaticResource IconPin}" Width="15" Height="15" /></Button>
-          <Button x:Name="CloseButton" Classes="tool" ToolTip.Tip="Schließen (Esc)"><PathIcon Data="{StaticResource IconClose}" Width="15" Height="15" /></Button>
+          <Button x:Name="CloseButton" Classes="tool" ToolTip.Tip="Schließen (Esc)">
+            <Panel>
+              <PathIcon Data="{StaticResource IconClose}" Width="15" Height="15" />
+              <!-- Countdown until the preview closes by itself; shrinks clockwise. -->
+              <Arc x:Name="AutoCloseRing" Width="23" Height="23" StartAngle="-90" SweepAngle="360"
+                   Stroke="{DynamicResource SystemAccentColor}" StrokeThickness="2" StrokeLineCap="Round"
+                   IsVisible="False" IsHitTestVisible="False" />
+            </Panel>
+          </Button>
         </StackPanel>
       </Grid>
     </StackPanel>

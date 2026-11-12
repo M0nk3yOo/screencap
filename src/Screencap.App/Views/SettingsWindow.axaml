@@ -60,6 +60,13 @@
             <TextBlock Text="Nach der Aufnahme" FontWeight="SemiBold" FontSize="15" />
             <CheckBox x:Name="CopyAfterCapture" Content="Automatisch in die Zwischenablage kopieren" />
             <CheckBox x:Name="AutoSave" Content="Jeden Screenshot automatisch im Speicherort sichern" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <CheckBox x:Name="AutoClosePreview" Content="Vorschau automatisch schließen nach" VerticalAlignment="Center" />
+              <NumericUpDown x:Name="AutoCloseSeconds" Minimum="1" Maximum="60" Increment="1" FormatString="0" Width="130" />
+              <TextBlock Text="Sekunden" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="Der Schließen-Knopf zeigt die verbleibende Zeit. Sobald du einen Knopf drückst, bleibt die Vorschau offen."
+                       Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0" />
           </StackPanel>
           <StackPanel Spacing="8">
             <TextBlock Text="Editor" FontWeight="SemiBold" FontSize="15" />

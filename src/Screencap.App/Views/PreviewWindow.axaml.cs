@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using System.Diagnostics;
 using Screencap.App.Services;
 using Screencap.Core;
 using Screencap.Core.Geometry;
@@ -23,6 +24,9 @@ public partial class PreviewWindow : Window
     private readonly PixelRect _region;
     private readonly Screen _screen;
     private IDisposable? _toastTimer;
+    private DispatcherTimer? _autoCloseTimer;
+    private readonly Stopwatch _autoCloseClock = new();
+    private TimeSpan _autoCloseAfter;
 
     // Required by the XAML loader for previews; not used at runtime.
     public PreviewWindow() : this(null!, null!, default, null!) { }
@@ -47,6 +51,9 @@ public partial class PreviewWindow : Window
         SaveButton.SetValue(ToolTip.TipProperty, $"Speichern ({command}S)");
         OcrButton.SetValue(ToolTip.TipProperty, "Text erkennen und kopieren");
 
+        // Any button counts as an action, so the preview stays open afterwards.
+        foreach (var button in new[] { EditButton, CopyButton, SaveButton, OcrButton, PinButton, CloseButton })
+            button.AddHandler(Button.ClickEvent, (_, _) => StopAutoClose(), Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
         EditButton.Click += (_, _) => Edit();
         CopyButton.Click += async (_, _) => await CopyAsync();
         SaveButton.Click += async (_, _) => await SaveAsync();
@@ -76,7 +83,44 @@ public partial class PreviewWindow : Window
             _app.WindowPlatform.ActivateApplication();
             Activate();
             Focus();
+            StartAutoClose();
         }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>True while the countdown on the close button runs.</summary>
+    internal bool IsAutoClosing => _autoCloseTimer is not null;
+
+    private void StartAutoClose()
+    {
+        var settings = _app.Settings;
+        if (!settings.AutoClosePreview || settings.AutoClosePreviewSeconds <= 0 || !IsVisible) return;
+        _autoCloseAfter = TimeSpan.FromSeconds(settings.AutoClosePreviewSeconds);
+        _autoCloseClock.Restart();
+        AutoCloseRing.SweepAngle = 360;
+        AutoCloseRing.IsVisible = true;
+        _autoCloseTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Render, (_, _) => AutoCloseTick());
+        _autoCloseTimer.Start();
+    }
+
+    private void AutoCloseTick()
+    {
+        var remaining = 1 - _autoCloseClock.Elapsed / _autoCloseAfter;
+        if (remaining <= 0)
+        {
+            StopAutoClose();
+            Close();
+            return;
+        }
+        AutoCloseRing.SweepAngle = 360 * remaining;
+    }
+
+    /// <summary>The user did something with the screenshot, so the preview no longer closes by itself.</summary>
+    internal void StopAutoClose()
+    {
+        _autoCloseTimer?.Stop();
+        _autoCloseTimer = null;
+        _autoCloseClock.Stop();
+        AutoCloseRing.IsVisible = false;
     }
 
     private void PlaceNextToRegion()
@@ -118,12 +162,15 @@ public partial class PreviewWindow : Window
                 break;
         }
         e.Handled = handled;
-        if (!handled) base.OnKeyDown(e);
+        // Shortcuts count as actions just like their buttons.
+        if (handled) StopAutoClose();
+        else base.OnKeyDown(e);
     }
 
     private void OnImagePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        StopAutoClose();
         if (e.ClickCount == 2) Edit();
         else BeginMoveDrag(e);
     }
@@ -204,6 +251,7 @@ public partial class PreviewWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _toastTimer?.Dispose();
+        StopAutoClose();
         base.OnClosed(e);
     }
 }

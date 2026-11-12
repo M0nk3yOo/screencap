@@ -26,6 +26,9 @@ public partial class SettingsWindow : Window
         CopyAfterCapture.IsChecked = settings.CopyToClipboardAfterCapture;
         AutoSave.IsChecked = settings.AutoSaveEveryCapture;
         RestoreTabs.IsChecked = settings.RestoreTabsOnStartup;
+        AutoClosePreview.IsChecked = settings.AutoClosePreview;
+        AutoCloseSeconds.Value = Math.Clamp(settings.AutoClosePreviewSeconds, 1, 60);
+        AutoCloseSeconds.IsEnabled = settings.AutoClosePreview;
         SaveFolder.Text = settings.SaveFolder;
         DeleteOld.IsChecked = settings.DeleteOldScreenshots;
         DeleteDays.Value = settings.DeleteAfterDays;
@@ -112,6 +115,16 @@ public partial class SettingsWindow : Window
             if (AutoSave.IsChecked == true && await app.EnsureSaveFolderAsync(this) is null)
                 AutoSave.IsChecked = false;
             SaveFolder.Text = settings.SaveFolder;
+        };
+        AutoClosePreview.IsCheckedChanged += (_, _) =>
+        {
+            AutoCloseSeconds.IsEnabled = AutoClosePreview.IsChecked == true;
+            Update(s => s.AutoClosePreview = AutoClosePreview.IsChecked == true);
+        };
+        AutoCloseSeconds.ValueChanged += (_, _) =>
+        {
+            if (AutoCloseSeconds.Value is not { } seconds) return;
+            Update(s => s.AutoClosePreviewSeconds = (int)seconds);
         };
         DeleteOld.IsCheckedChanged += (_, _) =>
         {

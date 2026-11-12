@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.6 – 2026-11-12
+
+- Vorschaufenster schließt sich nach der Aufnahme von selbst (Standard 5 Sekunden), ein Ring am Schließen-Knopf zeigt den Countdown; jede Aktion hält es offen. Dauer und Abschalten in den Einstellungen
+
 ## 1.0.5 – 2026-10-30
 
 - Updates: Screencap sucht beim Start und täglich bei GitHub nach einer neuen Version und installiert sie auf Wunsch (macOS und Windows); abschaltbar, manuell über Menü und Einstellungen

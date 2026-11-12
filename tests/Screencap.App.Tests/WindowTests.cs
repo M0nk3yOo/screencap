@@ -54,6 +54,39 @@ public sealed class WindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Preview_CountsDownOnCloseButton()
+    {
+        var app = CreateController();
+        var preview = ShowPreview(app, new Capture(TestImages.Solid(200, 150), 1));
+
+        Assert.True(preview.IsAutoClosing);
+        Assert.True(preview.FindControl<Avalonia.Controls.Shapes.Arc>("AutoCloseRing")!.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void Preview_ButtonPress_StopsCountdown()
+    {
+        var app = CreateController();
+        var preview = ShowPreview(app, new Capture(TestImages.Solid(200, 150), 1));
+
+        preview.FindControl<Button>("OcrButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.False(preview.IsAutoClosing);
+        Assert.False(preview.FindControl<Avalonia.Controls.Shapes.Arc>("AutoCloseRing")!.IsVisible);
+        Assert.True(preview.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void Preview_NoCountdown_WhenDisabled()
+    {
+        var app = CreateController();
+        app.Settings.AutoClosePreview = false;
+        var preview = ShowPreview(app, new Capture(TestImages.Solid(200, 150), 1));
+
+        Assert.False(preview.IsAutoClosing);
+    }
+
+    [AvaloniaFact]
     public void Preview_PinButton_OpensPin()
     {
         var app = CreateController();

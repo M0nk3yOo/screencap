@@ -34,6 +34,12 @@ public sealed class AppSettings
     /// <summary>Colors picked with the color picker, newest first (ARGB).</summary>
     public List<uint> CustomColors { get; set; } = [];
 
+    /// <summary>Close the preview after a capture by itself unless the user does something in it.</summary>
+    public bool AutoClosePreview { get; set; } = true;
+
+    /// <summary>Seconds until the preview closes when <see cref="AutoClosePreview"/> is on.</summary>
+    public int AutoClosePreviewSeconds { get; set; } = 5;
+
     /// <summary>Default folder for saving; empty = not chosen yet (the user is asked on first save).</summary>
     public string SaveFolder { get; set; } = "";
 
